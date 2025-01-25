@@ -39,7 +39,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700 text-center">
-          <p className="text-gray-600 dark:text-gray-400">&copy; 2025 MindfulAI. All rights reserved.</p>
+          <p className="text-gray-600 dark:text-gray-400">&copy; 2025 Serenity AI . All rights reserved.</p>
         </div>
       </div>
     </footer>

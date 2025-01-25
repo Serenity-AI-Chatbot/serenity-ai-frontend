@@ -20,7 +20,7 @@ export default function CallToAction() {
           Ready to Transform Your Mental Well-being?
         </h2>
         <p className="text-xl mb-8 max-w-2xl mx-auto">
-          Join thousands of users who have already improved their mental health with MindfulAI. Start your journey today!
+          Join thousands of users who have already improved their mental health with Serenity AI . Start your journey today!
         </p>
         <Button size="lg" variant="secondary" className="text-blue-600 dark:text-blue-800 bg-white hover:bg-gray-100">
           Get Started Now

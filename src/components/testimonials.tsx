@@ -4,7 +4,7 @@ import { InfiniteMovingCards } from '@/components/ui/infinite-moving-cards'
 
 const testimonials: { quote: string; name: string; title: string; }[] = [
   {
-    quote: 'MindfulAI has been a game-changer for my mental health. The personalized recommendations and exercises have helped me manage stress so much better.',
+    quote: 'Serenity AI  has been a game-changer for my mental health. The personalized recommendations and exercises have helped me manage stress so much better.',
     name: 'Sarah L.',
     title: 'Yoga Instructor',
   },
@@ -19,12 +19,12 @@ const testimonials: { quote: string; name: string; title: string; }[] = [
     title: 'Student',
   },
   {
-    quote: 'As a busy entrepreneur, MindfulAI has been invaluable in helping me manage stress and maintain work-life balance.',
+    quote: 'As a busy entrepreneur, Serenity AI  has been invaluable in helping me manage stress and maintain work-life balance.',
     name: 'David K.',
     title: 'Entrepreneur',
   },
   {
-    quote: 'The daily check-ins and personalized exercises have significantly improved my emotional well-being. I recommend MindfulAI to all my colleagues.',
+    quote: 'The daily check-ins and personalized exercises have significantly improved my emotional well-being. I recommend Serenity AI  to all my colleagues.',
     name: 'Lisa M.',
     title: 'Teacher',
   },
