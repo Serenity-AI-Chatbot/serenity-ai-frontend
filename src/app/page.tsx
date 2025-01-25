@@ -1,7 +1,7 @@
-import LandingPage from "@/components/home-page"
+import LandingPage from "@/components/landing/home-page"
 import { cookies } from "next/headers";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { AuthForm } from "@/components/auth-form";
+import { AuthForm } from "@/components/landing/auth-form";
 
 async function page() {
   const cookieStore = cookies();
