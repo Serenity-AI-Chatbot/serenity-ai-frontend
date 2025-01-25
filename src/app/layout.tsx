@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: "Serenity-AI",
@@ -17,10 +18,11 @@ export default function RootLayout({
       <body>
         <ThemeProvider
           attribute="class" // Change from data-theme to class
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem={false}
           storageKey="theme"
         >
+          <Toaster />
           {children}
         </ThemeProvider>
       </body>

@@ -1,36 +1,198 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌿 MindfulPath: Personalized Mental Wellness Companion
 
-## Getting Started
+## 📖 Project Overview
 
-First, run the development server:
+Serenity AI  is a comprehensive mental health application designed to support users' emotional well-being through journaling, mood tracking, personalized activities, and AI-powered insights.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 🚀 Key Features
+- Personalized mood tracking
+- Sentiment-aware journaling
+- AI-powered emotional insights
+- Activity and exercise recommendations
+- Gamification of mental wellness
+- Emergency support features
+
+## 🛠 Tech Stack
+
+### Frontend
+- Next.js 14
+- Tailwind CSS
+- Shadcn/UI Components
+- Vercel Deployment
+
+### Backend
+- Flask API
+- Supabase Authentication & Database
+- Google Gemini AI (Embeddings & Language Model)
+
+### Database
+- Supabase Postgres
+- Vector Embeddings
+- Row Level Security
+
+## 🔧 Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- Supabase Account
+- Google AI Studio API Key
+- Vercel Account (optional)
+
+## 📦 Project Structure
+
+```
+mental-health-app/
+│
+├── frontend/                # Next.js Application
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   └── styles/
+│
+├── backend/                 # Flask API
+│   ├── app.py
+│   ├── services/
+│   │   ├── gemini_service.py
+│   │   └── supabase_service.py
+│   └── utils/
+│
+├── database/                # Supabase Migrations & Functions
+│   ├── migrations/
+│   └── functions/
+│
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🔐 Environment Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Supabase Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a new Supabase project
+2. Enable the `vector` extension
+3. Run database migrations
+4. Set up Row Level Security (RLS)
 
-## Learn More
+#### Required Supabase Environment Variables
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Google Gemini AI Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Get API key from Google AI Studio
+2. Set environment variable
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+GEMINI_API_KEY=your_gemini_api_key
+```
 
-## Deploy on Vercel
+### 3. Backend Flask API Setup
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the Flask server
+python app.py
+```
+
+### 4. Frontend Next.js Setup
+
+```bash
+# Install dependencies
+cd frontend
+npm install
+
+# Run development server
+npm run dev
+```
+
+## 📊 Database Schema Highlights
+
+### Key Tables
+- `profiles`: Extended user information
+- `mood_entries`: Daily mood tracking
+- `journals`: User journal entries with embeddings
+- `activities`: Wellness activities
+- `achievements`: User progress tracking
+
+## 🧠 AI-Powered Features
+
+### Semantic Search Workflow
+1. Generate embedding for journal entries
+2. Store 768-dimensional vectors in Supabase
+3. Perform similarity search
+4. Generate context-aware responses
+
+### Empathetic Response Generation
+- Uses Gemini Pro for generating supportive messages
+- Considers user's mood, journal history, and current context
+
+## 🔒 Security Considerations
+
+- Supabase Row Level Security
+- Secure API routes
+- User-specific data access
+- Encryption of sensitive information
+
+## 🚀 Deployment
+
+### Frontend (Vercel)
+```bash
+vercel deploy
+```
+
+### Backend (Recommended: Railway/Render)
+- Deploy Flask API
+- Set environment variables
+- Configure CORS
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## 📞 Support
+
+For issues, please open a GitHub issue or contact support@mindfullpath.com
+
+---
+
+### 🌈 Future Roadmap
+- [ ] Multi-language support
+- [ ] Advanced machine learning models
+- [ ] Integration with health tracking devices
+- [ ] Professional therapist marketplace
+
+## 📦 Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mindfullpath.git
+
+# Setup backend
+cd backend
+pip install -r requirements.txt
+
+# Setup frontend
+cd ../frontend
+npm install
+
+# Run both simultaneously
+npm run dev:full
+```
+
+**Happy Mental Wellness Tracking! 🧘‍♀️✨**
