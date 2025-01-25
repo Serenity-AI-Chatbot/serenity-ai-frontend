@@ -1,4 +1,8 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
+const {
+  default: flattenColorPalette,
+} = require("tailwindcss/lib/util/flattenColorPalette");
 
 export default {
     darkMode: ["class"],
@@ -6,6 +10,7 @@ export default {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{ts,tsx}",
   ],
   theme: {
   	extend: {
@@ -55,8 +60,34 @@ export default {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
-  		}
+  		},
+  		backgroundImage: {
+  			'grid-pattern': 'linear-gradient(...)',
+  			'grid-pattern-light': 'linear-gradient(...)'
+  		},
+  		animation: {
+  			scroll:
+  				"scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite",
+  		},
+  		keyframes: {
+  			scroll: {
+  				to: {
+  					transform: "translate(calc(-50% - 0.5rem))",
+  				},
+  			},
+  		},
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate, addVariablesForColors],
 } satisfies Config;
+
+function addVariablesForColors({ addBase, theme }: any) {
+	const allColors = flattenColorPalette(theme("colors"));
+	const newVars = Object.fromEntries(
+		Object.entries(allColors).map(([key, val]) => [`--${key}`, val])
+	);
+
+	addBase({
+		":root": newVars,
+	});
+}
