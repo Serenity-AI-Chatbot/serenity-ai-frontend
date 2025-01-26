@@ -1,33 +1,39 @@
-import { NextResponse } from 'next/server';
-
-// Temporary mock data until we integrate Supabase
-const journals = [
-  {
-    id: 1,
-    date: '2024-01-26',
-    mood: '😊 Happy',
-    entry: 'Had a great day! Went for a walk at the beach and collected some sea shells. The scenery was beautiful and I enjoyed listening to the sounds of nature around me.',
-  },
-  {
-    id: 2,
-    date: '2024-01-25',
-    mood: '😐 Neutral',
-    entry: 'Regular work day. Nothing special happened, but that\'s okay too.',
-  },
-  {
-    id: 3,
-    date: '2024-01-24',
-    mood: '😢 Sad',
-    entry: 'Feeling a bit down today. Missing family and friends back home.',
-  },
-  {
-    id: 4,
-    date: '2024-01-23',
-    mood: '😊 Happy',
-    entry: 'Achieved a major milestone at work! Celebrated with the team.',
-  },
-];
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
-  return NextResponse.json(journals);
+  const { data, error } = await supabase
+    .from("journals")
+    .select("id, created_at, mood_score, content")
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const journals = data.map((journal) => ({
+    id: journal.id,
+    date: journal.created_at,
+    mood: `${getMoodEmoji(journal.mood_score)} ${getMoodLabel(journal.mood_score)}`,
+    entry: journal.content,
+  }))
+
+  return NextResponse.json(journals)
 }
+
+function getMoodEmoji(score: number): string {
+  if (score >= 8) return "😊"
+  if (score >= 6) return "🙂"
+  if (score >= 4) return "😐"
+  if (score >= 2) return "🙁"
+  return "😢"
+}
+
+function getMoodLabel(score: number): string {
+  if (score >= 8) return "Happy"
+  if (score >= 6) return "Good"
+  if (score >= 4) return "Neutral"
+  if (score >= 2) return "Sad"
+  return "Very Sad"
+}
+
