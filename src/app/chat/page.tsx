@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import ChatComponent from "@/components/chat-component"
+import ChatComponent from "@/components/chat/chat-component"
 
 export const metadata: Metadata = {
   title: "MindfulAI Chatbot",

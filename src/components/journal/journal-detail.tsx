@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Calendar, MapPin, Sparkles, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 interface JournalDetailProps {
   journal: {
@@ -10,7 +11,6 @@ interface JournalDetailProps {
     mood: string;
     entry: string;
   };
-  onBack: () => void;
 }
 
 // Function to analyze journal content and return relevant suggestions
@@ -59,7 +59,8 @@ const getJournalSuggestions = (entry: string) => {
   };
 };
 
-export function JournalDetail({ journal, onBack }: JournalDetailProps) {
+export function JournalDetail({ journal }: JournalDetailProps) {
+  const router = useRouter();
   const suggestions = getJournalSuggestions(journal.entry);
 
   return (
@@ -67,7 +68,7 @@ export function JournalDetail({ journal, onBack }: JournalDetailProps) {
       {/* Header with back button */}
       <div className="flex items-center gap-4 mb-6">
         <button
-          onClick={onBack}
+          onClick={() => router.back()}
           className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -108,8 +109,7 @@ export function JournalDetail({ journal, onBack }: JournalDetailProps) {
           {suggestions.photos.map((photo, index) => (
             <div 
               key={index} 
-              className="relative aspect-w-16 aspect-h-9 rounded-lg overflow-hidden"
-              style={{ paddingBottom: '56.25%' }} // 16:9 aspect ratio
+              className="relative h-48 rounded-lg overflow-hidden"
             >
               <Image
                 src={photo}

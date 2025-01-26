@@ -1,40 +1,33 @@
 'use client';
 
 import { Calendar, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-// Dummy data for previous journal entries
-const dummyJournals = [
-  {
-    id: 1,
-    date: '2024-01-26',
-    mood: '😊 Happy',
-    entry: 'Had a great day! Went for a walk at the beach and collected some sea shells. The scenery was beautiful and I enjoyed listening to the sounds of nature around me.',
-  },
-  {
-    id: 2,
-    date: '2024-01-25',
-    mood: '😐 Neutral',
-    entry: 'Regular work day. Nothing special happened, but that\'s okay too.',
-  },
-  {
-    id: 3,
-    date: '2024-01-24',
-    mood: '😢 Sad',
-    entry: 'Feeling a bit down today. Missing family and friends back home.',
-  },
-  {
-    id: 4,
-    date: '2024-01-23',
-    mood: '😊 Happy',
-    entry: 'Achieved a major milestone at work! Celebrated with the team.',
-  },
-];
-
-interface JournalHistoryProps {
-  onJournalSelect: (journal: any) => void;
+interface Journal {
+  id: number;
+  date: string;
+  mood: string;
+  entry: string;
 }
 
-export function JournalHistory({ onJournalSelect }: JournalHistoryProps) {
+export function JournalHistory() {
+  const router = useRouter();
+  const [journals, setJournals] = useState<Journal[]>([]);
+
+  useEffect(() => {
+    async function fetchJournals() {
+      const response = await fetch('/api/journal');
+      const data = await response.json();
+      setJournals(data);
+    }
+    fetchJournals();
+  }, []);
+
+  const handleJournalClick = (id: number) => {
+    router.push(`/journal/${id}`);
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-lg">
       <div className="flex items-center gap-2 mb-6">
@@ -43,10 +36,10 @@ export function JournalHistory({ onJournalSelect }: JournalHistoryProps) {
       </div>
 
       <div className="space-y-4">
-        {dummyJournals.map((journal) => (
+        {journals.map((journal) => (
           <button
             key={journal.id}
-            onClick={() => onJournalSelect(journal)}
+            onClick={() => handleJournalClick(journal.id)}
             className="w-full p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors text-left group"
           >
             <div className="flex justify-between items-start mb-2">

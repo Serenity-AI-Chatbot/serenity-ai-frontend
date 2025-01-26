@@ -1,4 +1,4 @@
-import { MainContent } from '@/components/MainContent';
+import { MainContent } from '@/components/journal/journal-page';
 
 export default function Home() {
   return (
