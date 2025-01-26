@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/seed_script/node_modules
 /.pnp
 .pnp.*
 .yarn/*
