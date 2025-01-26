@@ -31,20 +31,14 @@ export default function ChatComponent() {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
     }
-  }, [messages]) // Update this dependency to trigger on messages change
+  }, [scrollAreaRef]) // Updated dependency
 
   useEffect(() => {
-    // Load previous chats from localStorage
     const savedMessages = localStorage.getItem("chatMessages")
     if (savedMessages) {
       setMessages(JSON.parse(savedMessages))
     }
   }, [])
-
-  // useEffect(() => {
-  //   // Save chats to localStorage
-  //   localStorage.setItem("chatMessages", JSON.stringify(messages))
-  // }, [messages])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value)
@@ -82,6 +76,8 @@ export default function ChatComponent() {
       }
 
       let assistantMessage = ""
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -93,6 +89,10 @@ export default function ChatComponent() {
               const jsonData = JSON.parse(line.slice(5))
               if (jsonData.text) {
                 assistantMessage += jsonData.text
+                setMessages((prev: any) => {
+                  const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
+                  return updatedMessages
+                })
               }
             } catch (error) {
               console.error("Error parsing JSON:", error)
@@ -102,7 +102,7 @@ export default function ChatComponent() {
       }
 
       setMessages((prev: any) => {
-        const updatedMessages = [...prev, { role: "assistant", content: assistantMessage }]
+        const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
         localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
         return updatedMessages
       })
