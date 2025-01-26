@@ -1,45 +1,28 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MoodTrends } from "@/components/mood-trends"
-import { SentimentBreakdown } from "@/components/sentiment-breakdown"
-import { ActivityStats } from "@/components/activity-stats"
+import { MoodInsights } from "@/components/mood-insights"
+import { DashboardInsights } from "@/components/dashboard-insights"
+import { ActivityRecommendations } from "@/components/activity-recommendations"
 
-export default function InsightsPage() {
+export default function Home() {
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <header className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">Your Journey So Far</h1>
-        <p className="text-muted-foreground">Small steps make big changes!</p>
-      </header>
+    <div className="container mx-auto py-8">
+      <h1 className="text-4xl font-bold mb-8">Mood & Activity Dashboard</h1>
+      
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Mood Insights</h2>
+          <MoodInsights />
+        </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle>Mood Trends</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MoodTrends />
-          </CardContent>
-        </Card>
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Dashboard Analytics</h2>
+          <DashboardInsights />
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sentiment Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SentimentBreakdown />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity Stats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ActivityStats />
-          </CardContent>
-        </Card>
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Recommended Activities</h2>
+          <ActivityRecommendations currentMood={5} />
+        </section>
       </div>
     </div>
   )
 }
-

@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export async function GET() {
+  // Get the authenticated user's session
+    const cookieStore = cookies()
+    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore })
+  const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
+
+  if (!session || sessionError) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { data, error } = await supabase.rpc("get_mood_trends", {
-    p_user_id: "27664696-f7e7-4a09-927b-1967b6a0c8a4",
+    p_user_id: session.user.id,
     p_days_back: 7,
   })
 
