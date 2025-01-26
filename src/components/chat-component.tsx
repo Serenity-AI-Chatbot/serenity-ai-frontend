@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Loader2 } from "lucide-react"
 
 const SUGGESTED_PROMPTS = [
   "I'm feeling anxious about work. Any tips?",
@@ -28,7 +31,20 @@ export default function ChatComponent() {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
     }
-  }, [scrollAreaRef]) // Updated dependency
+  }, [messages]) // Update this dependency to trigger on messages change
+
+  useEffect(() => {
+    // Load previous chats from localStorage
+    const savedMessages = localStorage.getItem("chatMessages")
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages))
+    }
+  }, [])
+
+  // useEffect(() => {
+  //   // Save chats to localStorage
+  //   localStorage.setItem("chatMessages", JSON.stringify(messages))
+  // }, [messages])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value)
@@ -39,7 +55,11 @@ export default function ChatComponent() {
     if (!input.trim()) return
 
     const userMessage: Message = { role: "user", content: input }
-    setMessages((prev) => [...prev, userMessage])
+    setMessages((prev) => {
+      const updatedMessages = [...prev, userMessage]
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+      return updatedMessages
+    })
     setInput("")
     setIsTyping(true)
 
@@ -73,7 +93,6 @@ export default function ChatComponent() {
               const jsonData = JSON.parse(line.slice(5))
               if (jsonData.text) {
                 assistantMessage += jsonData.text
-                setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }])
               }
             } catch (error) {
               console.error("Error parsing JSON:", error)
@@ -81,12 +100,22 @@ export default function ChatComponent() {
           }
         }
       }
+
+      setMessages((prev: any) => {
+        const updatedMessages = [...prev, { role: "assistant", content: assistantMessage }]
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+        return updatedMessages
+      })
     } catch (error) {
       console.error("Error:", error)
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, there was an error processing your request." },
-      ])
+      setMessages((prev: any) => {
+        const updatedMessages = [
+          ...prev,
+          { role: "assistant", content: "Sorry, there was an error processing your request." },
+        ]
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+        return updatedMessages
+      })
     } finally {
       setIsTyping(false)
     }
@@ -96,36 +125,50 @@ export default function ChatComponent() {
     setInput(prompt)
   }
 
+  const handleClearChat = () => {
+    setMessages([])
+    localStorage.removeItem("chatMessages")
+  }
+
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Chat with MindfulAI</CardTitle>
+    <Card className="w-full max-w-3xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
+        <CardTitle className="text-2xl font-bold">Chat with MindfulAI</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         <ScrollArea className="h-[60vh] pr-4" ref={scrollAreaRef}>
           {messages.length === 0 && (
             <div className="text-center text-gray-500 mb-4">
-              <p>Welcome to MindfulAI! I'm here to support your mental well-being.</p>
-              <p>Feel free to ask me anything or try one of the suggested prompts below.</p>
+              <p className="text-lg font-semibold">Welcome to MindfulAI!</p>
+              <p>
+                I'm here to support your mental well-being. Feel free to ask me anything or try one of the suggested
+                prompts below.
+              </p>
             </div>
           )}
           {messages.map((m, index) => (
             <div key={index} className={`mb-4 ${m.role === "user" ? "text-right" : "text-left"}`}>
-              <span
-                className={`inline-block p-2 rounded-lg ${m.role === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-black"}`}
+              <div
+                className={`inline-block p-3 rounded-lg ${
+                  m.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-black"
+                }`}
               >
-                {m.content}
-              </span>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose max-w-none">
+                  {m.content}
+                </ReactMarkdown>
+              </div>
             </div>
           ))}
           {isTyping && (
             <div className="text-left">
-              <span className="inline-block p-2 rounded-lg bg-gray-200 text-black">MindfulAI is typing...</span>
+              <span className="inline-block p-3 rounded-lg bg-gray-100 text-black">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </span>
             </div>
           )}
         </ScrollArea>
         {messages.length === 0 && (
-          <div className="mt-4">
+          <div className="mt-6">
             <p className="text-sm font-semibold mb-2">Suggested prompts:</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_PROMPTS.map((prompt, index) => (
@@ -137,7 +180,7 @@ export default function ChatComponent() {
           </div>
         )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="border-t p-4">
         <form onSubmit={handleSubmit} className="flex w-full space-x-2">
           <Input value={input} onChange={handleInputChange} placeholder="Type your message..." className="flex-grow" />
           <Button type="submit" disabled={isTyping}>
@@ -145,6 +188,11 @@ export default function ChatComponent() {
           </Button>
         </form>
       </CardFooter>
+      <div className="px-4 pb-4">
+        <Button variant="outline" onClick={handleClearChat} className="w-full">
+          Clear Chat
+        </Button>
+      </div>
     </Card>
   )
 }
