@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useMoodStore } from "@/store/mood-store"
 
 interface Activity {
   activity_id: string
@@ -11,13 +12,17 @@ interface Activity {
   match_score: number
 }
 
-export function ActivityRecommendations({ currentMood }: { currentMood: number }) {
+export function ActivityRecommendations() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
+  const { moodData } = useMoodStore()
 
   useEffect(() => {
     async function fetchActivities() {
+      if (!moodData) return
+      
       try {
+        const currentMood = moodData.chartData[moodData.chartData.length - 1]?.mood
         const response = await fetch(`/api/recommended-activities?mood=${currentMood}`)
         if (!response.ok) throw new Error("Failed to fetch activities")
         const data = await response.json()
@@ -30,7 +35,7 @@ export function ActivityRecommendations({ currentMood }: { currentMood: number }
     }
 
     fetchActivities()
-  }, [currentMood])
+  }, [moodData])
 
   if (loading) return <div>Loading recommendations...</div>
 

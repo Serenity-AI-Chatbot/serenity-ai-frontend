@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useMoodStore } from "@/store/mood-store"
 
 interface MoodData {
   chartData: Array<{
@@ -16,28 +17,11 @@ interface MoodData {
 }
 
 export function MoodInsights() {
-  const [moodData, setMoodData] = useState<MoodData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { moodData, loading, error, fetchMoodTrends } = useMoodStore()
 
   useEffect(() => {
-    async function fetchMoodTrends() {
-      try {
-        const response = await fetch("/api/mood-trends")
-        if (!response.ok) {
-          throw new Error("Failed to fetch mood trends")
-        }
-        const data = await response.json()
-        setMoodData(data)
-      } catch (err) {
-        setError("Error fetching mood data")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchMoodTrends()
-  }, [])
+  }, [fetchMoodTrends])
 
   if (loading) return <div>Loading mood insights...</div>
   if (error) return <div>{error}</div>

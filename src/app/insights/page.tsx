@@ -20,7 +20,7 @@ export default function Home() {
 
         <section>
           <h2 className="text-2xl font-semibold mb-4">Recommended Activities</h2>
-          <ActivityRecommendations currentMood={5} />
+          <ActivityRecommendations/>
         </section>
       </div>
     </div>

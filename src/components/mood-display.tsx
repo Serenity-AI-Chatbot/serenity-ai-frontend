@@ -2,31 +2,23 @@
 
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useMoodStore } from "@/store/mood-store"
 
 interface MoodDisplayProps {
   mood: number
 }
 
-export function MoodDisplay({ mood }: MoodDisplayProps) {
+export function MoodDisplay() {
+  const { moodData } = useMoodStore()
   const [currentMood, setCurrentMood] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchLatestMood() {
-      try {
-        const response = await fetch('/api/mood-trends')
-        if (!response.ok) throw new Error("Failed to fetch mood")
-        const data = await response.json()
-        setCurrentMood(Math.round(data.averageMood))
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLatestMood()
-  }, [])
+    if (!moodData) return
+    const latestMood = moodData.chartData[moodData.chartData.length - 1]?.mood ?? null
+    setCurrentMood(latestMood)
+    setLoading(false)
+  }, [moodData])
 
   if (loading) {
     return (
@@ -36,7 +28,7 @@ export function MoodDisplay({ mood }: MoodDisplayProps) {
     )
   }
 
-  if (currentMood === null) {
+    if (currentMood === null) {
     return null
   }
 
