@@ -21,7 +21,10 @@ export async function GET(request: Request) {
     if (error) throw error
 
     return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+      },
     })
   } catch (error) {
     return new Response(JSON.stringify({ error: 'Failed to fetch user activities' }), {

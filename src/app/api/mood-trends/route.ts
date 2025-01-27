@@ -49,6 +49,10 @@ export async function GET() {
     moodChange: moodChange.toFixed(2),
     lastMood: lastEntry,
     previousMood: previousEntry
+  }, {
+    headers: {
+      'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+    }
   })
 }
 

@@ -23,7 +23,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     entry: data.content,
   }
 
-  return NextResponse.json(journal)
+  return NextResponse.json(journal, {
+    headers: {
+      'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+    }
+  })
 }
 
 function getMoodEmoji(score: number): string {

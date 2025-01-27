@@ -18,7 +18,10 @@ export async function GET(request: Request) {
     if (error) throw error
 
     return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300'
+      },
     })
   } catch (error) {
     return new Response(JSON.stringify({ error: 'Failed to fetch activities' }), {

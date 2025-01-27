@@ -18,7 +18,11 @@ export async function GET() {
     entry: journal.content,
   }))
 
-  return NextResponse.json(journals)
+  return NextResponse.json(journals, {
+    headers: {
+      'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+    }
+  })
 }
 
 function getMoodEmoji(score: number): string {

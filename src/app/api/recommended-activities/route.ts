@@ -29,7 +29,10 @@ export async function GET(request: Request) {
     if (error) throw error
 
     return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120'
+      },
     })
   } catch (error) {
     console.error('Recommended activities error:', error);
