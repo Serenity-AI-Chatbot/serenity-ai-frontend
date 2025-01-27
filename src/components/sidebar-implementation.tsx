@@ -1,0 +1,95 @@
+"use client";
+
+import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
+import { 
+  Home,
+  MessageSquare,
+  LineChart,
+  Book,
+  Activity,
+  LogOut
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+
+export function DashboardSidebar() {
+  const router = useRouter();
+
+  const sidebarLinks = [
+    {
+      label: "Home",
+      href: "/dashboard",
+      icon: <Home className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+    },
+    {
+      label: "Chat",
+      href: "/chat",
+      icon: <MessageSquare className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+    },
+    {
+      label: "Insights",
+      href: "/insights",
+      icon: <LineChart className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+    },
+    {
+      label: "Journal",
+      href: "/journal",
+      icon: <Book className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+    },
+    {
+      label: "Activity",
+      href: "/activities",
+      icon: <Activity className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+    }
+  ];
+
+  const handleSignOut = async () => {
+    try {
+      const response = await fetch('/signout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        router.push('/');
+      }
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  return (
+    <Sidebar>
+      <SidebarBody>
+        <div className="flex flex-col h-full justify-between">
+          {/* Main navigation links */}
+          <div className="flex flex-col gap-2">
+            {sidebarLinks.map((link) => (
+              <SidebarLink 
+                key={link.href}
+                link={link}
+              />
+            ))}
+          </div>
+          
+          {/* Sign out button at bottom */}
+          <div className="mb-4">
+            <div 
+              onClick={handleSignOut}
+              className="cursor-pointer"
+            >
+              <SidebarLink
+                link={{
+                  label: "Sign Out",
+                  href: "#",
+                  icon: <LogOut className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </SidebarBody>
+    </Sidebar>
+  );
+}

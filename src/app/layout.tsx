@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
@@ -23,7 +23,11 @@ export default function RootLayout({
           storageKey="theme"
         >
           <Toaster />
-          {children}
+          <div className="flex h-screen">
+            <main className="flex-1 overflow-auto">
+              {children}
+            </main>
+          </div>
         </ThemeProvider>
       </body>
     </html>
