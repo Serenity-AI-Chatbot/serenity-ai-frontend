@@ -1,8 +1,8 @@
-import { ActivityGrid } from "@/components/activity-grid"
+import { ActivityGrid } from "@/components/activities/activity-grid"
 import { MoodDisplay } from "@/components/mood-display"
-import { ProgressTracker } from "@/components/progress-tracker"
+import { ProgressTracker } from "@/components/activities/progress-tracker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ActivityRecommendations } from "@/components/activity-recommendations"
+import { ActivityRecommendations } from "@/components/activities/activity-recommendations"
 
 export default function ActivitiesPage() {
   return (

@@ -1,6 +1,6 @@
 import { MoodInsights } from "@/components/mood-insights"
 import { DashboardInsights } from "@/components/dashboard-insights"
-import { ActivityRecommendations } from "@/components/activity-recommendations"
+import { ActivityRecommendations } from "@/components/activities/activity-recommendations"
 
 export default function Home() {
   return (
