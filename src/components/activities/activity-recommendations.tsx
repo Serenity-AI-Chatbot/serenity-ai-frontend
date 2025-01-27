@@ -40,21 +40,23 @@ export function ActivityRecommendations() {
   if (loading) return <div>Loading recommendations...</div>
 
   return (
-    <Card>
+    <Card className="bg-white dark:bg-black">
       <CardHeader>
-        <CardTitle>Recommended Activities</CardTitle>
+        <CardTitle className="text-gray-900 dark:text-emerald-500">Recommended Activities</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div key={activity.activity_id} className="border rounded-lg p-4">
+            <div key={activity.activity_id} className="border border-gray-200 dark:border-emerald-500/20 rounded-lg p-4 bg-white dark:bg-black">
               <div className="flex justify-between items-start">
-                <h3 className="font-semibold">{activity.title}</h3>
-                <Badge variant={activity.match_score > 0.7 ? "default" : "secondary"}>
+                <h3 className="font-semibold text-gray-900 dark:text-emerald-500">{activity.title}</h3>
+                <Badge variant={activity.match_score > 0.7 ? "default" : "secondary"}
+                  className="bg-emerald-500 text-white dark:bg-emerald-500/20 dark:text-emerald-500"
+                >
                   {Math.round(activity.match_score * 100)}% Match
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">{activity.description}</p>
+              <p className="text-sm text-gray-600 dark:text-emerald-500/70 mt-2">{activity.description}</p>
             </div>
           ))}
         </div>

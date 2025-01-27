@@ -83,28 +83,28 @@ export function DashboardInsights() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card>
+      <Card className="bg-white dark:bg-black">
         <CardHeader>
-          <CardTitle>Weekly Journal Entries</CardTitle>
+          <CardTitle className="text-gray-900 dark:text-emerald-500">Weekly Journal Entries</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.journal_trends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="journal_count" fill="#8884d8" />
+                <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-emerald-500/20" />
+                <XAxis dataKey="week" className="text-gray-600 dark:text-emerald-500/70" />
+                <YAxis className="text-gray-600 dark:text-emerald-500/70" />
+                <Tooltip contentStyle={{ backgroundColor: 'rgb(0 0 0 / 0.3)', border: '1px solid #10b981' }} />
+                <Bar dataKey="journal_count" fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white dark:bg-black">
         <CardHeader>
-          <CardTitle>Activity Distribution</CardTitle>
+          <CardTitle className="text-gray-900 dark:text-emerald-500">Activity Distribution</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
@@ -116,16 +116,16 @@ export function DashboardInsights() {
                   cy="50%"
                   innerRadius={60}
                   outerRadius={80}
-                  fill="#8884d8"
+                  fill="#10b981"
                   paddingAngle={5}
                   dataKey="value"
-                  label
+                  label={{ fill: 'currentColor', className: 'text-gray-900 dark:text-emerald-500' }}
                 >
                   {activityTypeData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={ACTIVITY_COLORS[index % ACTIVITY_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ backgroundColor: 'rgb(0 0 0 / 0.3)', border: '1px solid #10b981' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>

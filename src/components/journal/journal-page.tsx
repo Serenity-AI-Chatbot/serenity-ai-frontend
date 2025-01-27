@@ -17,8 +17,8 @@ export function MainContent() {
           onClick={() => setView('write')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
             view === 'write'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-white dark:bg-black text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
           }`}
         >
           <PenSquare className="w-5 h-5" />
@@ -28,8 +28,8 @@ export function MainContent() {
           onClick={() => setView('history')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
             view === 'history'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-white dark:bg-black text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
           }`}
         >
           <BookOpen className="w-5 h-5" />

@@ -11,17 +11,17 @@ export function NavigationLinks() {
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/journal" passHref>
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
             <BookOpen className="mr-2 h-4 w-4" /> Journaling
           </Button>
         </Link>
         <Link href="/activities" passHref>
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
             <Activity className="mr-2 h-4 w-4" /> Activities
           </Button>
         </Link>
         <Link href="/insights" passHref>
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
             <BarChart2 className="mr-2 h-4 w-4" /> Insights
           </Button>
         </Link>

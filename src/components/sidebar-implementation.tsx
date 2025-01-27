@@ -18,27 +18,27 @@ export function DashboardSidebar() {
     {
       label: "Home",
       href: "/dashboard",
-      icon: <Home className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+      icon: <Home className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
     },
     {
       label: "Chat",
       href: "/chat",
-      icon: <MessageSquare className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+      icon: <MessageSquare className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
     },
     {
       label: "Insights",
       href: "/insights",
-      icon: <LineChart className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+      icon: <LineChart className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
     },
     {
       label: "Journal",
       href: "/journal",
-      icon: <Book className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+      icon: <Book className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
     },
     {
       label: "Activity",
       href: "/activities",
-      icon: <Activity className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+      icon: <Activity className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
     }
   ];
 
@@ -69,6 +69,7 @@ export function DashboardSidebar() {
               <SidebarLink 
                 key={link.href}
                 link={link}
+                className="hover:bg-emerald-500/40 rounded-md"
               />
             ))}
           </div>
@@ -83,8 +84,9 @@ export function DashboardSidebar() {
                 link={{
                   label: "Sign Out",
                   href: "#",
-                  icon: <LogOut className="w-5 h-5 text-neutral-700 dark:text-neutral-200" />
+                  icon: <LogOut className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
                 }}
+                className="hover:bg-emerald-500/40 rounded-md"
               />
             </div>
           </div>

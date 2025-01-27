@@ -23,19 +23,19 @@ export function MoodDisplay() {
   if (loading) {
     return (
       <div className="flex justify-center">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
       </div>
     )
   }
 
-    if (currentMood === null) {
+  if (currentMood === null) {
     return null
   }
 
   const emoji = currentMood >= 7 ? "😊" : currentMood >= 4 ? "😐" : "😔"
 
   return (
-    <div className="flex items-center justify-center space-x-2 text-lg">
+    <div className="flex items-center justify-center space-x-2 text-lg text-gray-900 dark:text-emerald-500">
       <span>Feeling: {emoji}</span>
       <span>({currentMood}/10)</span>
     </div>

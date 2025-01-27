@@ -12,7 +12,7 @@ export function QuickAccessCards() {
         </CardHeader>
         <CardContent>
           <Link href="/journal" passHref>
-            <Button className="w-full">
+            <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white">
               <PenLine className="mr-2 h-4 w-4" /> Start Journaling
             </Button>
           </Link>
@@ -25,7 +25,7 @@ export function QuickAccessCards() {
         <CardContent>
           <p className="mb-4">Take a 10-minute walk. Let's refresh your mind!</p>
           <Link href="/activities" passHref>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
               <Walk className="mr-2 h-4 w-4" /> Start Activity
             </Button>
           </Link>

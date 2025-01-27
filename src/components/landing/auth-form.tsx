@@ -89,10 +89,10 @@ export function AuthForm() {
   };
 
   return (
-    <Card className="p-6 w-full max-w-md mx-auto">
+    <Card className="p-6 w-full max-w-md mx-auto bg-white dark:bg-black">
       <div className="flex items-center gap-2 mb-6">
-        <Store className="w-6 h-6" />
-        <h1 className="text-2xl font-bold">
+        <Store className="w-6 h-6 text-emerald-500" />
+        <h1 className="text-2xl font-bold text-emerald-500">
           {isSignUp ? 'Create Store Account' : 'Sign In to Your Store'}
         </h1>
       </div>
@@ -105,6 +105,7 @@ export function AuthForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            className="bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
           />
         </div>
         <div>
@@ -114,6 +115,7 @@ export function AuthForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            className="bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
           />
         </div>
         {isSignUp && (
@@ -123,10 +125,15 @@ export function AuthForm() {
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
               required
+              className="bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
             />
           </div>
         )}
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button 
+          type="submit" 
+          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
+          disabled={isLoading}
+        >
           {isLoading
             ? 'Loading...'
             : isSignUp
@@ -135,11 +142,11 @@ export function AuthForm() {
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-muted-foreground">
+      <p className="mt-4 text-center text-sm text-gray-600 dark:text-emerald-500/70">
         {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
         <button
           onClick={() => setIsSignUp(!isSignUp)}
-          className="text-primary hover:underline"
+          className="text-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400"
         >
           {isSignUp ? 'Sign In' : 'Create Account'}
         </button>

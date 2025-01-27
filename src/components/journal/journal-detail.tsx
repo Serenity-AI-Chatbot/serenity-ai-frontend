@@ -69,7 +69,7 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700"
+          className="flex items-center gap-2 text-emerald-500 hover:text-emerald-600"
         >
           <ArrowLeft className="w-5 h-5" />
           Back to Journal List
@@ -77,11 +77,11 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       </div>
 
       {/* Main journal content */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white dark:bg-black rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-600" />
-            <span className="text-lg font-medium text-gray-900">
+            <Calendar className="w-5 h-5 text-emerald-500" />
+            <span className="text-lg font-medium text-gray-900 dark:text-emerald-500">
               {new Date(journal.date).toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -90,11 +90,11 @@ export function JournalDetail({ journal }: JournalDetailProps) {
               })}
             </span>
           </div>
-          <span className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full flex items-center gap-2">
+          <span className="px-4 py-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 rounded-full flex items-center gap-2">
             {journal.mood}
           </span>
         </div>
-        <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">
+        <p className="text-gray-700 dark:text-emerald-500/70 text-lg leading-relaxed whitespace-pre-wrap">
           {journal.entry}
         </p>
       </div>
@@ -102,7 +102,7 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       {/* Suggested photos */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
-          <ImageIcon className="w-5 h-5 text-indigo-600" />
+          <ImageIcon className="w-5 h-5 text-emerald-600" />
           <h2 className="text-xl font-semibold text-gray-900">Related Imagery</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -126,14 +126,14 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       {/* Suggested places */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="w-5 h-5 text-indigo-600" />
+          <MapPin className="w-5 h-5 text-emerald-600" />
           <h2 className="text-xl font-semibold text-gray-900">Recommended Places</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {suggestions.places.map((place, index) => (
             <div
               key={index}
-              className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors"
+              className="p-4 border border-gray-200 rounded-lg hover:border-emerald-300 transition-colors"
             >
               <h3 className="font-medium text-gray-900">{place.name}</h3>
               <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
@@ -148,16 +148,16 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       {/* Suggested activities */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-indigo-600" />
+          <Sparkles className="w-5 h-5 text-emerald-600" />
           <h2 className="text-xl font-semibold text-gray-900">Suggested Activities</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {suggestions.activities.map((activity, index) => (
             <div
               key={index}
-              className="p-4 bg-indigo-50 rounded-lg flex items-center gap-3"
+              className="p-4 bg-emerald-50 rounded-lg flex items-center gap-3"
             >
-              <span className="w-8 h-8 flex items-center justify-center bg-indigo-100 rounded-full text-indigo-600">
+              <span className="w-8 h-8 flex items-center justify-center bg-emerald-100 rounded-full text-emerald-600">
                 {index + 1}
               </span>
               <span className="text-gray-800">{activity}</span>

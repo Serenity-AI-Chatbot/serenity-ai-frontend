@@ -85,16 +85,16 @@ export function ProgressTracker({ type }: ProgressTrackerProps) {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     )
   }
 
   if (activities.length === 0) {
     return (
-      <Card>
+      <Card className="bg-white dark:bg-black">
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">
+          <p className="text-center text-gray-600 dark:text-emerald-500/70">
             No {type} activities found
           </p>
         </CardContent>
@@ -105,20 +105,20 @@ export function ProgressTracker({ type }: ProgressTrackerProps) {
   return (
     <div className="space-y-4">
       {activities.map((activity) => (
-        <Card key={activity.id}>
+        <Card key={activity.id} className="bg-white dark:bg-black">
           <CardHeader>
-            <CardTitle>{activity.activities.title}</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-emerald-500">{activity.activities.title}</CardTitle>
           </CardHeader>
           <CardContent>
             <Progress 
               value={activity.status === "completed" ? 100 : 50} 
-              className="w-full" 
+              className="w-full bg-gray-200 dark:bg-emerald-500/20"
             />
             {type === "planned" && (
               <div className="mt-4 space-y-4">
                 <Textarea 
                   placeholder="How did this activity make you feel?"
-                  className="w-full"
+                  className="w-full bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
                   onChange={(e) => {
                     const updatedActivities = activities.map(a => 
                       a.id === activity.id 
@@ -129,7 +129,7 @@ export function ProgressTracker({ type }: ProgressTrackerProps) {
                   }}
                 />
                 <Button 
-                  className="w-full"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
                   onClick={() => completeActivity(activity.id, activity.reflection || '')}
                 >
                   Complete Activity
@@ -138,8 +138,8 @@ export function ProgressTracker({ type }: ProgressTrackerProps) {
             )}
             {type === "completed" && activity.reflection && (
               <div className="mt-4">
-                <h4 className="font-medium mb-2">Reflection</h4>
-                <p className="text-sm text-muted-foreground">{activity.reflection}</p>
+                <h4 className="font-medium text-gray-900 dark:text-emerald-500 mb-2">Reflection</h4>
+                <p className="text-sm text-gray-600 dark:text-emerald-500/70">{activity.reflection}</p>
               </div>
             )}
           </CardContent>

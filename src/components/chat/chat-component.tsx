@@ -131,15 +131,15 @@ export default function ChatComponent() {
   }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
+    <Card className="w-full max-w-3xl mx-auto bg-white dark:bg-black shadow-xl rounded-xl overflow-hidden">
+      <CardHeader className="bg-emerald-500 text-white p-6">
         <CardTitle className="text-2xl font-bold">Chat with MindfulAI</CardTitle>
       </CardHeader>
       <CardContent className="p-6">
         <ScrollArea className="h-[60vh] pr-4" ref={scrollAreaRef}>
           {messages.length === 0 && (
-            <div className="text-center text-gray-500 mb-4">
-              <p className="text-lg font-semibold">Welcome to MindfulAI!</p>
+            <div className="text-center text-gray-500 dark:text-emerald-500/70 mb-4">
+              <p className="text-lg font-semibold">Welcome to Serenity-AI!</p>
               <p>
                 I'm here to support your mental well-being. Feel free to ask me anything or try one of the suggested
                 prompts below.
@@ -150,10 +150,15 @@ export default function ChatComponent() {
             <div key={index} className={`mb-4 ${m.role === "user" ? "text-right" : "text-left"}`}>
               <div
                 className={`inline-block p-3 rounded-lg ${
-                  m.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-black"
+                  m.role === "user" 
+                    ? "bg-emerald-500 text-white" 
+                    : "bg-gray-100 dark:bg-black border border-emerald-500/20 text-gray-900 dark:text-emerald-500"
                 }`}
               >
-                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose max-w-none">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]} 
+                  className="prose dark:prose-invert max-w-none prose-emerald"
+                >
                   {m.content}
                 </ReactMarkdown>
               </div>
@@ -161,7 +166,7 @@ export default function ChatComponent() {
           ))}
           {isTyping && (
             <div className="text-left">
-              <span className="inline-block p-3 rounded-lg bg-gray-100 text-black">
+              <span className="inline-block p-3 rounded-lg bg-gray-100 dark:bg-black border border-emerald-500/20 text-gray-900 dark:text-emerald-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </span>
             </div>
@@ -169,10 +174,16 @@ export default function ChatComponent() {
         </ScrollArea>
         {messages.length === 0 && (
           <div className="mt-6">
-            <p className="text-sm font-semibold mb-2">Suggested prompts:</p>
+            <p className="text-sm font-semibold mb-2 text-gray-900 dark:text-emerald-500">Suggested prompts:</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_PROMPTS.map((prompt, index) => (
-                <Button key={index} variant="outline" size="sm" onClick={() => handleSuggestedPrompt(prompt)}>
+                <Button 
+                  key={index} 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleSuggestedPrompt(prompt)}
+                  className="border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                >
                   {prompt}
                 </Button>
               ))}
@@ -180,16 +191,29 @@ export default function ChatComponent() {
           </div>
         )}
       </CardContent>
-      <CardFooter className="border-t p-4">
+      <CardFooter className="border-t border-gray-200 dark:border-emerald-500/20 p-4">
         <form onSubmit={handleSubmit} className="flex w-full space-x-2">
-          <Input value={input} onChange={handleInputChange} placeholder="Type your message..." className="flex-grow" />
-          <Button type="submit" disabled={isTyping}>
+          <Input 
+            value={input} 
+            onChange={handleInputChange} 
+            placeholder="Type your message..." 
+            className="flex-grow bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+          />
+          <Button 
+            type="submit" 
+            disabled={isTyping}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white"
+          >
             Send
           </Button>
         </form>
       </CardFooter>
       <div className="px-4 pb-4">
-        <Button variant="outline" onClick={handleClearChat} className="w-full">
+        <Button 
+          variant="outline" 
+          onClick={handleClearChat} 
+          className="w-full border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+        >
           Clear Chat
         </Button>
       </div>

@@ -90,18 +90,29 @@ export function ActivityGrid() {
   return (
     <div className="space-y-4">
       <div className="flex justify-center space-x-2">
-        <Button variant={filter === null ? "default" : "outline"} onClick={() => setFilter(null)}>
+        <Button 
+          variant={filter === null ? "default" : "outline"} 
+          onClick={() => setFilter(null)}
+          className={filter === null 
+            ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+            : "border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+          }
+        >
           All
         </Button>
-        <Button variant={filter === "physical" ? "default" : "outline"} onClick={() => setFilter("physical")}>
-          Physical
-        </Button>
-        <Button variant={filter === "mental" ? "default" : "outline"} onClick={() => setFilter("mental")}>
-          Mental
-        </Button>
-        <Button variant={filter === "social" ? "default" : "outline"} onClick={() => setFilter("social")}>
-          Social
-        </Button>
+        {["physical", "mental", "social"].map((category) => (
+          <Button 
+            key={category}
+            variant={filter === category ? "default" : "outline"} 
+            onClick={() => setFilter(category)}
+            className={filter === category 
+              ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+              : "border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+            }
+          >
+            {category.charAt(0).toUpperCase() + category.slice(1)}
+          </Button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -114,22 +125,27 @@ export function ActivityGrid() {
               : 'Not specified'
 
           return (
-            <Card key={activity.id}>
+            <Card key={activity.id} className="bg-white dark:bg-black">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Icon className="h-6 w-6" />
+                <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-emerald-500">
+                  <Icon className="h-6 w-6 text-emerald-500" />
                   <span>{activity.title}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Badge>{activity.category}</Badge>
-                <p className="mt-2">Difficulty: {activity.difficulty_level}</p>
-                <p>Duration: {activity.estimated_duration} minutes</p>
-                <p>Best for mood scores: {moodRange}</p>
-                <p className="mt-2 text-sm text-muted-foreground">{activity.description}</p>
+                <Badge className="bg-emerald-500 text-white dark:bg-emerald-500/20 dark:text-emerald-500">
+                  {activity.category}
+                </Badge>
+                <p className="mt-2 text-gray-900 dark:text-emerald-500">Difficulty: {activity.difficulty_level}</p>
+                <p className="text-gray-900 dark:text-emerald-500">Duration: {activity.estimated_duration} minutes</p>
+                <p className="text-gray-900 dark:text-emerald-500">Best for mood scores: {moodRange}</p>
+                <p className="mt-2 text-sm text-gray-600 dark:text-emerald-500/70">{activity.description}</p>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" onClick={() => startActivity(activity.id)}>
+                <Button 
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
+                  onClick={() => startActivity(activity.id)}
+                >
                   Start Activity
                 </Button>
               </CardFooter>
