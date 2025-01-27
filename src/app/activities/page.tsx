@@ -2,6 +2,7 @@ import { ActivityGrid } from "@/components/activity-grid"
 import { MoodDisplay } from "@/components/mood-display"
 import { ProgressTracker } from "@/components/progress-tracker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ActivityRecommendations } from "@/components/activity-recommendations"
 
 export default function ActivitiesPage() {
   return (
@@ -12,7 +13,7 @@ export default function ActivitiesPage() {
       </header>
 
       <ActivityGrid />
-
+      <ActivityRecommendations currentMood={7} />
       <Tabs defaultValue="planned" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="planned">Planned</TabsTrigger>

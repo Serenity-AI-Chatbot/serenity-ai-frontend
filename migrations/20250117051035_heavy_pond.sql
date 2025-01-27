@@ -57,30 +57,40 @@ CREATE TABLE user_activities (
     reflection TEXT
 );
 
--- Mood Trend Analysis Function
+-- Modified Mood Trend Analysis Function
 CREATE OR REPLACE FUNCTION get_mood_trends(
-    p_user_id UUID, 
-    p_days_back INT DEFAULT 30
+    p_user_id UUID
 )
 RETURNS TABLE (
+    entry_date DATE,
     average_mood FLOAT,
     mood_trend TEXT,
     total_entries BIGINT
 ) LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
+    WITH daily_moods AS (
+        SELECT 
+            DATE(created_at) as entry_date,
+            AVG(mood_score)::FLOAT as daily_average,
+            COUNT(*) as entries
+        FROM journals
+        WHERE user_id = p_user_id 
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at)
+    )
     SELECT 
-        COALESCE(AVG(mood_score), 0)::FLOAT AS average_mood,
+        dm.entry_date,
+        dm.daily_average as average_mood,
         CASE 
-            WHEN AVG(mood_score) BETWEEN 1 AND 3 THEN 'Low'
-            WHEN AVG(mood_score) BETWEEN 4 AND 6 THEN 'Moderate'
-            WHEN AVG(mood_score) BETWEEN 7 AND 10 THEN 'High'
+            WHEN dm.daily_average BETWEEN 1 AND 3 THEN 'Low'
+            WHEN dm.daily_average BETWEEN 4 AND 6 THEN 'Moderate'
+            WHEN dm.daily_average BETWEEN 7 AND 10 THEN 'High'
             ELSE 'No Data'
         END AS mood_trend,
-        COUNT(*)::BIGINT AS total_entries
-    FROM journals
-    WHERE user_id = p_user_id 
-    AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL;
+        dm.entries as total_entries
+    FROM daily_moods dm
+    ORDER BY dm.entry_date;
 END;
 $$;
 

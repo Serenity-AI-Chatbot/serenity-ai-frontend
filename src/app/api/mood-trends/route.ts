@@ -14,9 +14,9 @@ export async function GET() {
   }
 
   const { data, error } = await supabase.rpc("get_mood_trends", {
-    p_user_id: session.user.id,
-    p_days_back: 7,
+    p_user_id: session.user.id
   })
+
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -26,16 +26,29 @@ export async function GET() {
     return NextResponse.json({ error: "No mood data available" }, { status: 404 })
   }
 
-  const { average_mood, mood_trend, total_entries } = data[0]
+  // Calculate overall average mood
+  const overallAverageMood = data.reduce((sum:any, day:any):any  => sum + day.average_mood, 0) / data.length
 
-  // Calculate the percentage change in mood
-  const moodChange = ((average_mood - 3) / 3) * 100 // Assuming 3 is the neutral mood
+  // Calculate the percentage change between the last two entries
+  const lastEntry = data[data.length - 1].average_mood
+  const previousEntry = data[data.length - 2]?.average_mood || lastEntry
+
+  const moodChange = ((lastEntry - previousEntry) / previousEntry) * 100
+
+  // Format the data for the line chart
+  const chartData = data.map((day:any) => ({
+    date: new Date(day.entry_date).toLocaleDateString(),
+    mood: parseFloat(day.average_mood.toFixed(2))
+  }))
 
   return NextResponse.json({
-    averageMood: average_mood,
-    moodTrend: mood_trend,
-    totalEntries: total_entries,
+    chartData,
+    averageMood: overallAverageMood,
+    moodTrend: data[data.length - 1]?.mood_trend || 'No Data',
+    totalEntries: data.reduce((sum:any, day:any) => sum + day.total_entries, 0),
     moodChange: moodChange.toFixed(2),
+    lastMood: lastEntry,
+    previousMood: previousEntry
   })
 }
 

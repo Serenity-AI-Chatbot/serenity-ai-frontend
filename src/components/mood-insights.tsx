@@ -5,6 +5,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface MoodData {
+  chartData: Array<{
+    date: string
+    mood: number
+  }>
   averageMood: number
   moodTrend: string
   totalEntries: number
@@ -39,30 +43,38 @@ export function MoodInsights() {
   if (error) return <div>{error}</div>
   if (!moodData) return <div>No mood data available</div>
 
-  const data = [
-    { day: "Mon", mood: 3 },
-    { day: "Tue", mood: 2 },
-    { day: "Wed", mood: 4 },
-    { day: "Thu", mood: 3 },
-    { day: "Fri", mood: 5 },
-    { day: "Sat", mood: 4 },
-    { day: "Sun", mood: moodData.averageMood },
-  ]
-
   return (
     <div className="space-y-4">
       <p className="text-center font-medium">
-        Your mood has {Number.parseFloat(moodData.moodChange) > 0 ? "improved" : "decreased"} by{" "}
-        {Math.abs(Number.parseFloat(moodData.moodChange))}% this week!
+        {Number.parseFloat(moodData.moodChange) === 0 
+          ? "Your mood has remained stable"
+          : `Your mood has ${Number.parseFloat(moodData.moodChange) > 0 ? "improved" : "decreased"} by ${Math.abs(Number.parseFloat(moodData.moodChange))}%`
+        } from previous entry
       </p>
-      <div className="h-64 w-full">
+      <div className="h-[400px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
+          <LineChart data={moodData.chartData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="day" />
-            <YAxis domain={[1, 5]} />
+            <XAxis 
+              dataKey="date"
+              angle={-45}
+              textAnchor="end"
+              height={60}
+              interval={"preserveStartEnd"}
+            />
+            <YAxis 
+              domain={[1, 10]} 
+              label={{ value: 'Mood Score', angle: -90, position: 'insideLeft' }}
+            />
             <Tooltip />
-            <Line type="monotone" dataKey="mood" stroke="#8884d8" />
+            <Line 
+              type="monotone" 
+              dataKey="mood" 
+              stroke="#8884d8"
+              strokeWidth={2}
+              dot={{ strokeWidth: 2 }}
+              name="Mood"
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -77,7 +89,7 @@ export function MoodInsights() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Mood Trend</CardTitle>
+            <CardTitle>Current Trend</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{moodData.moodTrend}</p>
