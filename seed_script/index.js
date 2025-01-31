@@ -272,36 +272,21 @@ async function seedJournals() {
             
             // Mock related articles
             const latestArticles = {
-                articles: [
-                    { 
-                        title: faker.lorem.sentence(), 
-                        url: faker.internet.url(),
-                        relevance_score: faker.number.float({ min: 0.7, max: 1.0 })
-                    },
-                    { 
-                        title: faker.lorem.sentence(), 
-                        url: faker.internet.url(),
-                        relevance_score: faker.number.float({ min: 0.7, max: 1.0 })
-                    }
-                ]
+                articles: Array(5).fill(null).map(() => ({
+                    title: faker.company.name(),
+                    link: faker.internet.url(),
+                    snippet: faker.lorem.paragraph()
+                }))
             };
             
-            // Mock nearby places
             const nearbyPlaces = {
-                places: [
-                    { 
-                        name: faker.company.name(), 
-                        distance: faker.number.float({ min: 0.1, max: 5.0 }),
-                        category: faker.helpers.arrayElement(['park', 'cafe', 'gym', 'library']),
-                        rating: faker.number.float({ min: 3.5, max: 5.0 })
-                    },
-                    { 
-                        name: faker.company.name(), 
-                        distance: faker.number.float({ min: 0.1, max: 5.0 }),
-                        category: faker.helpers.arrayElement(['park', 'cafe', 'gym', 'library']),
-                        rating: faker.number.float({ min: 3.5, max: 5.0 })
-                    }
-                ]
+                places: Array(10).fill(null).map(() => ({
+                    name: faker.company.name() + " Park",
+                    address: faker.location.streetAddress() + ", " + faker.location.city(),
+                    rating: faker.number.float({ min: 3.5, max: 5.0, precision: 0.1 }),
+                    types: ["park", "point_of_interest", "establishment"],
+                    user_ratings_total: faker.number.int({ min: 10, max: 8000 })
+                }))
             };
 
             // Extract key sentences for analysis
