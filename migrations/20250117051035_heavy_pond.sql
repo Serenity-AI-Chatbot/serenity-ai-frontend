@@ -136,37 +136,54 @@ BEGIN
 END;
 $$;
 
--- Semantic Search Function for Journals (unchanged)
+-- Drop the old function if it exists
+DROP FUNCTION IF EXISTS match_journals;
+
+-- Create a new function with explicit parameter names
 CREATE OR REPLACE FUNCTION match_journals(
-    query_embedding VECTOR(768), 
-    match_threshold FLOAT, 
-    match_count INT,
+    query_embedding VECTOR(768),
+    match_threshold FLOAT,
+    match_count INTEGER,
     user_id UUID
 )
 RETURNS TABLE (
     id UUID,
+    title TEXT,
     content TEXT,
     summary TEXT,
+    mood_tags TEXT[],
+    tags TEXT[],
+    keywords TEXT[],
     created_at TIMESTAMP WITH TIME ZONE,
     similarity FLOAT
 )
 LANGUAGE plpgsql
+STABLE
 AS $$
+#variable_conflict use_column
 BEGIN
     RETURN QUERY
     SELECT 
-        journals.id,
-        journals.content,
-        journals.summary,
-        journals.created_at,
-        1 - (journals.embedding <=> query_embedding) AS similarity
-    FROM journals
-    WHERE journals.user_id = user_id
-    AND 1 - (journals.embedding <=> query_embedding) > match_threshold
+        j.id,
+        j.title,
+        j.content,
+        j.summary,
+        j.mood_tags,
+        j.tags,
+        j.keywords,
+        j.created_at,
+        1 - (j.embedding <=> query_embedding) AS similarity
+    FROM journals j
+    WHERE j.user_id = match_journals.user_id
+    AND 1 - (j.embedding <=> query_embedding) > match_journals.match_threshold
     ORDER BY similarity DESC
-    LIMIT match_count;
+    LIMIT match_journals.match_count;
 END;
 $$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION match_journals TO authenticated;
+GRANT EXECUTE ON FUNCTION match_journals TO service_role;
 
 -- Updated Dashboard Analytics Function
 /*

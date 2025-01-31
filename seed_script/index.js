@@ -15,9 +15,20 @@ const USER_ID = '6b92d5c4-1034-44fd-8653-0f40b478d621';
 const EMBEDDING_MODEL = 'embedding-001';
 
 // Utility function to generate embeddings
-async function generateEmbedding(text) {
+async function generateEmbedding(journalEntry) {
+    // Create a rich context string that includes all relevant journal information
+    const contextString = `
+Title: ${journalEntry.title}
+Date: ${journalEntry.created_at}
+Content: ${journalEntry.content}
+Mood Tags: ${journalEntry.mood_tags.join(', ')}
+Tags: ${journalEntry.tags.join(', ')}
+Keywords: ${journalEntry.keywords ? journalEntry.keywords.join(', ') : ''}
+Summary: ${journalEntry.summary || ''}
+`.trim();
+
     const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
-    const result = await model.embedContent(text);
+    const result = await model.embedContent(contextString);
     return result.embedding.values;
 }
 
@@ -265,49 +276,49 @@ async function seedJournals() {
         const currentDate = new Date();
 
         for (const entry of manualJournalEntries) {
-            // Generate AI enhancements
-            const embedding = await generateEmbedding(entry.content);
+            // Generate summary and keywords first
             const summary = await generateSummary(entry.content);
             const keywords = await extractKeywords(entry.content);
             
-            // Mock related articles
-            const latestArticles = {
-                articles: Array(5).fill(null).map(() => ({
-                    title: faker.company.name(),
-                    link: faker.internet.url(),
-                    snippet: faker.lorem.paragraph()
-                }))
-            };
-            
-            const nearbyPlaces = {
-                places: Array(10).fill(null).map(() => ({
-                    name: faker.company.name() + " Park",
-                    address: faker.location.streetAddress() + ", " + faker.location.city(),
-                    rating: faker.number.float({ min: 3.5, max: 5.0, precision: 0.1 }),
-                    types: ["park", "point_of_interest", "establishment"],
-                    user_ratings_total: faker.number.int({ min: 10, max: 8000 })
-                }))
-            };
-
-            // Extract key sentences for analysis
-            const sentences = entry.content
-                .split(/[.!?]+/)
-                .map(s => s.trim())
-                .filter(s => s.length > 0);
-
-            journalEntries.push({
+            // Create the complete journal entry object
+            const journalEntry = {
                 user_id: USER_ID,
                 title: entry.title,
                 content: entry.content,
                 summary,
                 mood_tags: entry.mood_tags,
-                embedding,
                 keywords,
-                latest_articles: latestArticles,
-                nearby_places: nearbyPlaces,
-                sentences,
                 tags: entry.tags,
                 created_at: new Date(currentDate.getTime() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000))
+            };
+
+            // Generate embedding with all context
+            const embedding = await generateEmbedding(journalEntry);
+            
+            // Add embedding and other fields to the journal entry
+            journalEntries.push({
+                ...journalEntry,
+                embedding,
+                latest_articles: {
+                    articles: Array(5).fill(null).map(() => ({
+                        title: faker.company.name(),
+                        link: faker.internet.url(),
+                        snippet: faker.lorem.paragraph()
+                    }))
+                },
+                nearby_places: {
+                    places: Array(10).fill(null).map(() => ({
+                        name: faker.company.name() + " Park",
+                        address: faker.location.streetAddress() + ", " + faker.location.city(),
+                        rating: faker.number.float({ min: 3.5, max: 5.0, precision: 0.1 }),
+                        types: ["park", "point_of_interest", "establishment"],
+                        user_ratings_total: faker.number.int({ min: 10, max: 8000 })
+                    }))
+                },
+                sentences: entry.content
+                    .split(/[.!?]+/)
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0)
             });
         }
 
