@@ -4,16 +4,16 @@ import { notFound } from 'next/navigation';
 async function getJournal(id: string) {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/journal/${id}`, {
-      cache: 'no-store'
+      cache: 'no-store',
     });
-    
+
     if (!res.ok) {
       if (res.status === 404) {
         return null;
       }
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-    
+
     return res.json();
   } catch (error) {
     console.error('Error fetching journal:', error);
@@ -21,13 +21,15 @@ async function getJournal(id: string) {
   }
 }
 
-export default async function JournalPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const journal = await getJournal(params.id);
-  
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+
+export default async function JournalPage({ params }: Props) {
+  const { id } = await params;
+  const journal = await getJournal(id);
+
   if (!journal) {
     notFound();
   }
