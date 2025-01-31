@@ -21,19 +21,25 @@ async function generateEmbedding(text) {
     return result.embedding.values;
 }
 
-// Utility function to generate AI summary
+// Utility function to generate AI summary (simplified version without Gemini)
 async function generateSummary(text) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(`Summarize this journal entry in 2-3 sentences: ${text}`);
-    return result.response.text;
+    // Simple summary generation by taking first 2-3 sentences
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    return sentences.slice(0, 2).join('. ') + '.';
 }
 
-// Utility function to extract keywords
+// Utility function to extract keywords (simplified version without Gemini)
 async function extractKeywords(text) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(`Extract 5-7 key topics or themes from this text as single words: ${text}`);
-    const response = result.response.text();
-    return response.split(',').map(keyword => keyword.trim().toLowerCase());
+    // Common keywords to extract from text
+    const commonKeywords = [
+        'work', 'health', 'family', 'friends', 'exercise', 'meditation',
+        'stress', 'happiness', 'goals', 'achievement', 'challenge', 'growth',
+        'relationship', 'career', 'learning', 'nature', 'creativity', 'self-care',
+        'motivation', 'gratitude', 'mindfulness', 'productivity', 'balance'
+    ];
+    
+    const textLower = text.toLowerCase();
+    return commonKeywords.filter(keyword => textLower.includes(keyword)).slice(0, 7);
 }
 
 // Seed Activities
@@ -147,6 +153,108 @@ const manualJournalEntries = [
         content: "Volunteered at the local food bank today. The sense of community and shared purpose was powerful. Met amazing people, each with their own story. Reminded me how small acts of kindness can create ripples of positive change.",
         mood_tags: ['grateful', 'inspired', 'connected'],
         tags: ['community', 'personal']
+    },
+    {
+        title: "Achievement Unlocked",
+        content: "Today was an incredible day at work! Finally completed the major project I've been working on for months. The team's reaction was priceless, and our client was beyond satisfied. This success has boosted my confidence tremendously. Celebrated with the team over virtual champagne - even through screens, the joy was contagious!",
+        mood_tags: ['accomplished', 'proud', 'excited'],
+        tags: ['work', 'achievement', 'personal']
+    },
+    {
+        title: "Family Game Night",
+        content: "Had the most amazing evening with family playing board games and sharing stories. Haven't laughed this hard in ages! It's these simple moments of connection that mean the most. Everyone was in such high spirits, and even my usually competitive sister was more focused on fun than winning.",
+        mood_tags: ['joyful', 'loved', 'content'],
+        tags: ['family', 'fun', 'connection']
+    },
+    {
+        title: "Workout Milestone",
+        content: "Hit a new personal record at the gym today! The consistent training is finally paying off. Started this journey feeling intimidated, but now I feel unstoppable. The endorphin rush is real, and my energy levels are through the roof. Proud of sticking to my fitness goals despite initial struggles.",
+        mood_tags: ['energetic', 'strong', 'motivated'],
+        tags: ['health', 'fitness', 'achievement']
+    },
+    {
+        title: "Dealing with Setbacks",
+        content: "Today was rough. Got passed over for the promotion I was hoping for. Feeling disappointed but trying to maintain perspective. Going to use this as motivation to work on developing new skills. Sometimes setbacks are setups for comebacks.",
+        mood_tags: ['disappointed', 'determined', 'resilient'],
+        tags: ['work', 'growth', 'challenge']
+    },
+    {
+        title: "Morning Mindfulness",
+        content: "Started the day with a peaceful meditation session by the window. The morning sun and gentle breeze created the perfect atmosphere. Feel centered and ready to take on whatever comes my way. These quiet moments of self-reflection are becoming my favorite part of the day.",
+        mood_tags: ['peaceful', 'centered', 'mindful'],
+        tags: ['mindfulness', 'self-care', 'morning-routine']
+    },
+    {
+        title: "Social Anxiety Victory",
+        content: "Pushed myself to attend a networking event despite my anxiety. Initially wanted to leave, but ended up making some great connections. Proud of myself for stepping out of my comfort zone. Each small victory over anxiety feels like a major breakthrough.",
+        mood_tags: ['anxious', 'proud', 'brave'],
+        tags: ['personal-growth', 'social', 'anxiety']
+    },
+    {
+        title: "Creative Flow",
+        content: "Lost track of time working on my art project today. The creative flow was incredible - colors, ideas, and inspiration just kept coming. Haven't felt this kind of pure creative joy in a while. Sometimes the best art comes when you let go of expectations.",
+        mood_tags: ['inspired', 'focused', 'creative'],
+        tags: ['art', 'creativity', 'flow']
+    },
+    {
+        title: "Travel Adventures",
+        content: "Just returned from an incredible solo trip to Japan! The blend of ancient traditions and modern technology was mind-blowing. From peaceful temples in Kyoto to the bustling streets of Tokyo, every moment was a new discovery. Tried foods I've never heard of and met wonderful people despite the language barrier.",
+        mood_tags: ['adventurous', 'excited', 'inspired'],
+        tags: ['travel', 'culture', 'personal-growth']
+    },
+    {
+        title: "New Friendship Connection",
+        content: "Met someone at a local book club who just gets me! We spent hours discussing our favorite authors and sharing life stories. It's rare to find someone who shares such similar interests and perspectives. Looking forward to building this friendship.",
+        mood_tags: ['happy', 'connected', 'grateful'],
+        tags: ['friendship', 'social', 'connection']
+    },
+    {
+        title: "Career Breakthrough",
+        content: "After months of studying and practice, I finally mastered that challenging programming concept! The moment it clicked was pure euphoria. My mentor's guidance really paid off, and I can already see how this will open new opportunities in my career.",
+        mood_tags: ['accomplished', 'confident', 'motivated'],
+        tags: ['career', 'learning', 'achievement']
+    },
+    {
+        title: "Healing Process",
+        content: "Today was a tough day dealing with the breakup. Spent time journaling and crying, but also practiced self-care with a long bath and favorite music. Emotions are raw but I know this is part of the healing journey. Called my best friend who helped put things in perspective.",
+        mood_tags: ['sad', 'vulnerable', 'healing'],
+        tags: ['relationships', 'emotional-processing', 'self-care']
+    },
+    {
+        title: "Garden Success",
+        content: "My first harvest from the garden today! The tomatoes and herbs I planted months ago finally produced fruit. There's something magical about eating food you've grown yourself. Even the mistakes and failed plants taught me valuable lessons about patience and persistence.",
+        mood_tags: ['proud', 'satisfied', 'peaceful'],
+        tags: ['hobby', 'nature', 'achievement']
+    },
+    {
+        title: "Family Reconciliation",
+        content: "Had a heart-to-heart with my sister after years of distance. We both acknowledged past hurts and shared our perspectives. It wasn't easy, but the weight lifted from finally addressing these issues feels incredible. Taking small steps toward rebuilding our relationship.",
+        mood_tags: ['emotional', 'hopeful', 'relieved'],
+        tags: ['family', 'relationships', 'healing']
+    },
+    {
+        title: "Volunteer Impact",
+        content: "Spent the day at the animal shelter and witnessed two long-term residents finally find their forever homes. The joy on both the animals' and adopters' faces was priceless. Reminded me how small actions can make a big difference in others' lives.",
+        mood_tags: ['fulfilled', 'joyful', 'inspired'],
+        tags: ['volunteering', 'community', 'purpose']
+    },
+    {
+        title: "Health Journey",
+        content: "Six months into my health journey and finally seeing real progress! Blood pressure is down, energy is up, and clothes fit better. More importantly, I feel stronger and more capable every day. Grateful for the support of my workout buddy who keeps me accountable.",
+        mood_tags: ['proud', 'energetic', 'determined'],
+        tags: ['health', 'fitness', 'personal-growth']
+    },
+    {
+        title: "Creative Block Breakthrough",
+        content: "After weeks of creative block, inspiration finally struck! Tried a new technique in my painting and the results exceeded my expectations. Sometimes stepping away and trying something completely different is exactly what's needed to spark creativity again.",
+        mood_tags: ['creative', 'excited', 'relieved'],
+        tags: ['art', 'creativity', 'breakthrough']
+    },
+    {
+        title: "Financial Victory",
+        content: "Finally paid off my student loans! Years of budgeting, side hustles, and saying no to unnecessary purchases have paid off. Celebrated by treating myself to a nice dinner - it tastes better when you know you can truly afford it. Ready to start saving for future goals.",
+        mood_tags: ['accomplished', 'proud', 'free'],
+        tags: ['finance', 'achievement', 'goals']
     }
 ];
 

@@ -177,101 +177,130 @@ RETURNS JSONB LANGUAGE plpgsql AS $$
 DECLARE
     result JSONB;
 BEGIN
-    WITH journal_analytics AS (
+    WITH mood_counts AS (
         SELECT 
             DATE_TRUNC('week', created_at) AS week,
-            COUNT(*) AS journal_count,
-            -- Aggregate mood tags
-            jsonb_object_agg(
-                unnest(mood_tags),
-                COUNT(*)
-            ) AS mood_distribution,
-            -- Extract keywords frequency
-            jsonb_object_agg(
-                unnest(keywords),
-                COUNT(*)
-            ) AS keyword_distribution
+            unnest(mood_tags) as mood,
+            COUNT(*) as count
         FROM journals
         WHERE user_id = p_user_id 
-          AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
-        GROUP BY week
-        ORDER BY week
+        AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+        GROUP BY DATE_TRUNC('week', created_at), unnest(mood_tags)
+    ),
+    
+    keyword_counts AS (
+        SELECT 
+            DATE_TRUNC('week', created_at) AS week,
+            unnest(keywords) as keyword,
+            COUNT(*) as count
+        FROM journals
+        WHERE user_id = p_user_id 
+        AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+        GROUP BY DATE_TRUNC('week', created_at), unnest(keywords)
+    ),
+    
+    journal_analytics AS (
+        SELECT 
+            DATE_TRUNC('week', j.created_at) AS week,
+            COUNT(*) AS journal_count,
+            (
+                SELECT jsonb_object_agg(mood, count)
+                FROM mood_counts mc
+                WHERE mc.week = DATE_TRUNC('week', j.created_at)
+            ) AS mood_distribution,
+            (
+                SELECT jsonb_object_agg(keyword, count)
+                FROM keyword_counts kc
+                WHERE kc.week = DATE_TRUNC('week', j.created_at)
+            ) AS keyword_distribution
+        FROM journals j
+        WHERE j.user_id = p_user_id 
+        AND j.created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+        GROUP BY DATE_TRUNC('week', j.created_at)
     ),
     
     activity_analytics AS (
         SELECT 
-            DATE_TRUNC('week', completed_at) AS week,
+            DATE_TRUNC('week', ua.completed_at) AS week,
             COUNT(*) AS completed_activities,
-            AVG(difficulty_rating) AS avg_activity_difficulty,
-            
-            -- Activity type breakdown
-            SUM(CASE WHEN a.category = 'physical' THEN 1 ELSE 0 END) AS physical_activities,
-            SUM(CASE WHEN a.category = 'mental' THEN 1 ELSE 0 END) AS mental_activities,
-            SUM(CASE WHEN a.category = 'social' THEN 1 ELSE 0 END) AS social_activities
+            ROUND(AVG(ua.difficulty_rating)::numeric, 2) AS avg_activity_difficulty,
+            jsonb_build_object(
+                'physical', COUNT(*) FILTER (WHERE a.category = 'physical'),
+                'mental', COUNT(*) FILTER (WHERE a.category = 'mental'),
+                'social', COUNT(*) FILTER (WHERE a.category = 'social')
+            ) as activity_types
         FROM user_activities ua
         JOIN activities a ON ua.activity_id = a.id
         WHERE ua.user_id = p_user_id 
-          AND ua.completed_at IS NOT NULL
-          AND ua.completed_at >= NOW() - (p_days_back || ' days')::INTERVAL
-        GROUP BY week
-        ORDER BY week
-    )
+        AND ua.completed_at IS NOT NULL
+        AND ua.completed_at >= NOW() - (p_days_back || ' days')::INTERVAL
+        GROUP BY DATE_TRUNC('week', ua.completed_at)
+    ),
     
-    -- Compile final JSON result
+    mood_totals AS (
+        SELECT mood, COUNT(*) as count
+        FROM journals,
+        LATERAL unnest(mood_tags) as mood
+        WHERE user_id = p_user_id
+        AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+        GROUP BY mood
+        ORDER BY count DESC
+        LIMIT 5
+    )
+
     SELECT jsonb_build_object(
-        'journal_trends', (
-            SELECT jsonb_agg(
-                jsonb_build_object(
-                    'week', week,
-                    'journal_count', journal_count,
-                    'mood_distribution', mood_distribution,
-                    'keyword_distribution', keyword_distribution
+        'journal_trends', COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'week', week,
+                        'journal_count', journal_count,
+                        'mood_distribution', COALESCE(mood_distribution, '{}'::jsonb),
+                        'keyword_distribution', COALESCE(keyword_distribution, '{}'::jsonb)
+                    )
+                    ORDER BY week
                 )
-            )
-            FROM journal_analytics
+                FROM journal_analytics
+            ),
+            '[]'::jsonb
         ),
         
-        'activity_trends', (
-            SELECT jsonb_agg(
-                jsonb_build_object(
-                    'week', week,
-                    'completed_activities', completed_activities,
-                    'avg_activity_difficulty', avg_activity_difficulty,
-                    'activity_types', jsonb_build_object(
-                        'physical', physical_activities,
-                        'mental', mental_activities,
-                        'social', social_activities
+        'activity_trends', COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'week', week,
+                        'completed_activities', completed_activities,
+                        'avg_activity_difficulty', avg_activity_difficulty,
+                        'activity_types', activity_types
                     )
+                    ORDER BY week
                 )
-            )
-            FROM activity_analytics
+                FROM activity_analytics
+            ),
+            '[]'::jsonb
         ),
         
         'summary_insights', jsonb_build_object(
             'total_journals', (
-                SELECT COUNT(*) 
-                FROM journals 
-                WHERE user_id = p_user_id 
+                SELECT COUNT(*)
+                FROM journals
+                WHERE user_id = p_user_id
                 AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
             ),
             'total_activities', (
-                SELECT COUNT(*) 
-                FROM user_activities 
-                WHERE user_id = p_user_id 
-                AND completed_at IS NOT NULL 
+                SELECT COUNT(*)
+                FROM user_activities
+                WHERE user_id = p_user_id
+                AND completed_at IS NOT NULL
                 AND completed_at >= NOW() - (p_days_back || ' days')::INTERVAL
             ),
-            'most_common_moods', (
-                SELECT jsonb_object_agg(mood, count)
-                FROM (
-                    SELECT unnest(mood_tags) as mood, COUNT(*) as count
-                    FROM journals
-                    WHERE user_id = p_user_id 
-                    AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
-                    GROUP BY unnest(mood_tags)
-                    ORDER BY count DESC
-                    LIMIT 5
-                ) top_moods
+            'most_common_moods', COALESCE(
+                (
+                    SELECT jsonb_object_agg(mood, count)
+                    FROM mood_totals
+                ),
+                '{}'::jsonb
             )
         )
     ) INTO result;

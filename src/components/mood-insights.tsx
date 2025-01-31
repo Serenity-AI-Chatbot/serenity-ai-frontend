@@ -1,19 +1,36 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useEffect } from "react"
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Legend,
+} from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useMoodStore } from "@/store/mood-store"
 
-interface MoodData {
-  chartData: Array<{
-    date: string
-    mood: number
-  }>
-  averageMood: number
-  moodTrend: string
-  totalEntries: number
-  moodChange: string
+// Color palette for moods
+const MOOD_COLORS = {
+  happy: "#FFB6C1", // pink
+  excited: "#FFD700", // gold
+  grateful: "#98FB98", // pale green
+  inspired: "#87CEEB", // sky blue
+  connected: "#DDA0DD", // plum
+  peaceful: "#B0E0E6", // powder blue
+  determined: "#F08080", // light coral
+  anxious: "#D3D3D3", // light gray
+  hopeful: "#FFA07A", // light salmon
+  creative: "#9370DB", // medium purple
+  reflective: "#20B2AA", // light sea green
+  curious: "#FF7F50", // coral
 }
 
 export function MoodInsights() {
@@ -27,69 +44,135 @@ export function MoodInsights() {
   if (error) return <div>{error}</div>
   if (!moodData) return <div>No mood data available</div>
 
+  const journalTrends = moodData.journalTrends
+
+  // Aggregate all moods across weeks
+  const moodTotals = journalTrends.reduce(
+    (acc, week) => {
+      Object.entries(week.moodDistribution).forEach(([mood, count]) => {
+        acc[mood] = (acc[mood] || 0) + count
+      })
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const moodChartData = Object.entries(moodTotals).map(([mood, count]) => ({
+    mood,
+    count,
+  }))
+
+  // Aggregate all keywords across weeks
+  const keywordTotals = journalTrends.reduce(
+    (acc, week) => {
+      Object.entries(week.keywordDistribution).forEach(([keywords, count]) => {
+        // Split the keywords string and count each keyword
+        keywords.split("\n").forEach((keyword) => {
+          const cleanKeyword = keyword.replace(/^-\s*/, "").trim()
+          if (cleanKeyword) {
+            acc[cleanKeyword] = (acc[cleanKeyword] || 0) + count
+          }
+        })
+      })
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const keywordChartData = Object.entries(keywordTotals)
+    .map(([keyword, count]) => ({
+      keyword,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count) // Sort by count in descending order
+
   return (
-    <div className="space-y-4">
-      <p className="text-center font-medium text-gray-900 dark:text-emerald-500">
-        {Number.parseFloat(moodData.moodChange) === 0 
-          ? "Your mood has remained stable"
-          : `Your mood has ${Number.parseFloat(moodData.moodChange) > 0 ? "improved" : "decreased"} by ${Math.abs(Number.parseFloat(moodData.moodChange))}%`
-        } from previous entry
-      </p>
-      <div className="h-[400px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={moodData.chartData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-emerald-500/20" />
-            <XAxis 
-              dataKey="date"
-              angle={-45}
-              textAnchor="end"
-              height={60}
-              interval={"preserveStartEnd"}
-              className="text-gray-600 dark:text-emerald-500/70"
-            />
-            <YAxis 
-              domain={[1, 10]} 
-              label={{ value: 'Mood Score', angle: -90, position: 'insideLeft' }}
-              className="text-gray-600 dark:text-emerald-500/70"
-            />
-            <Tooltip contentStyle={{ backgroundColor: 'rgb(0 0 0 / 0.3)', border: '2px solid #10b981' }} />
-            <Line 
-              type="monotone" 
-              dataKey="mood" 
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={{ strokeWidth: 2, fill: "#10b981", stroke: "#10b981" }}
-              name="Mood"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <Card className="bg-white dark:bg-black">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-emerald-500">Average Mood</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-emerald-500">{moodData.averageMood.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white dark:bg-black">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-emerald-500">Current Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-emerald-500">{moodData.moodTrend}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white dark:bg-black">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-emerald-500">Total Entries</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-emerald-500">{moodData.totalEntries}</p>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Journal Entries per Week</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={journalTrends}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="week"
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                  angle={-45}
+                  textAnchor="end"
+                  height={70}
+                />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="journalCount" fill="#8884d8" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mood Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={moodChartData}
+                  dataKey="count"
+                  nameKey="mood"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={150}
+                  label={(entry) => entry.mood}
+                >
+                  {moodChartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={MOOD_COLORS[entry.mood as keyof typeof MOOD_COLORS] || `hsl(${index * 30}, 70%, 50%)`}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Keyword Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={keywordChartData}
+                  dataKey="count"
+                  nameKey="keyword"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={150}
+                  label={(entry) => entry.keyword}
+                >
+                  {keywordChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={`hsl(${index * (360 / keywordChartData.length)}, 70%, 60%)`} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
