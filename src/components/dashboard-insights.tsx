@@ -29,7 +29,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function DashboardInsights() {
   const { moodData, loading, fetchMoodTrends } = useMoodStore()
-  const [timeRange, setTimeRange] = useState("90")
+  const [timeRange, setTimeRange] = useState("30")
 
   useEffect(() => {
     fetchMoodTrends(Number(timeRange))
@@ -67,7 +67,8 @@ export function DashboardInsights() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5)
 
-  const totalMoods = moodDistributionData.length
+  const totalMoods = moodDistributionData.reduce((acc, curr) => acc + curr.value, 0)
+  const uniqueMoods = moodDistributionData.length
 
   const journalData = moodData.journalTrends.map((trend) => ({
     week: new Date(trend.week).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
@@ -110,7 +111,9 @@ export function DashboardInsights() {
             <SelectValue placeholder="Select time range" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="15">Last 15 days</SelectItem>
             <SelectItem value="30">Last 30 days</SelectItem>
+            <SelectItem value="60">Last 60 days</SelectItem>
             <SelectItem value="90">Last 90 days</SelectItem>
             <SelectItem value="180">Last 6 months</SelectItem>
             <SelectItem value="365">Last year</SelectItem>
@@ -235,13 +238,13 @@ export function DashboardInsights() {
                                 className="fill-foreground text-3xl font-bold"
                               >
                                 {totalMoods.toLocaleString()}
-                              </tspan>
-                              <tspan
-                                x={viewBox.cx}
-                                y={(viewBox.cy || 0) + 24}
-                                className="fill-muted-foreground"
-                              >
-                                Total Moods
+                                <tspan
+                                  x={viewBox.cx}
+                                  y={(viewBox.cy || 0) + 20}
+                                  className="fill-foreground text-lg"
+                                >
+                                  ({uniqueMoods} types)
+                                </tspan>
                               </tspan>
                             </text>
                           )

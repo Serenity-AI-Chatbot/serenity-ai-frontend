@@ -8,6 +8,7 @@ import { ChartContainer, ChartLegend, ChartTooltip, ChartTooltipContent } from "
 import { useMoodStore } from "@/store/mood-store"
 
 const TIME_PERIODS = [
+  { value: "15", label: "15 Days" },
   { value: "30", label: "30 Days" },
   { value: "60", label: "60 Days" },
   { value: "90", label: "90 Days" },
@@ -40,7 +41,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function MoodInsights() {
   const { moodData, loading, error, fetchMoodTrends } = useMoodStore()
-  const [selectedDays, setSelectedDays] = useState<string>("90")
+  const [selectedDays, setSelectedDays] = useState<string>("30")
 
   useEffect(() => {
     fetchMoodTrends(Number(selectedDays))
