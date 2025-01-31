@@ -112,34 +112,298 @@ npm install
 # Run development server
 npm run dev
 ```
+## 📊 Database Schema
+
+### Core Tables
+
+#### 1. Journals Table
+- Stores user journal entries with AI enhancements
+- Fields:
+  - Basic: id, user_id, title, content
+  - AI Insights: summary, mood_tags, embedding, keywords
+  - Metadata: created_at, tags
+  - Location: nearby_places (JSONB)
+  - Related Content: latest_articles (JSONB)
+
+#### 2. Activities Table
+- Catalog of wellness activities
+- Fields:
+  - Basic: id, title, description, category
+  - Difficulty: difficulty_level (beginner/intermediate/advanced)
+  - Mood Matching: recommended_moods
+  - Planning: estimated_duration
+  - Organization: tags
+
+#### 3. User Activities Table
+- Tracks user engagement with activities
+- Fields:
+  - References: user_id, activity_id
+  - Status: planned_at, completed_at, status
+  - Feedback: difficulty_rating, reflection
+
+## 🔍 Database Functions
+
+### 1. get_mood_trends()
+sql
+Function: get_mood_trends(p_user_id UUID)
+Returns: TABLE (entry_date DATE, mood_categories JSONB, total_entries BIGINT)
+- Analyzes mood patterns over time
+- Groups mood tags by date
+- Aggregates mood frequencies
+- Provides total entries per day
+
+### 2. get_recommended_activities()
+sql
+Function: get_recommended_activities(p_user_id UUID, p_current_mood_tags TEXT[])
+Returns: TABLE (activity_id UUID, title TEXT, description TEXT, match_score double precision)
+- Recommends activities based on current mood
+- Calculates mood-activity match scores
+- Uses intersection algorithm for matching
+- Returns top 5 matched activities
+
+### 3. match_journals()
+sql
+Function: match_journals(query_embedding VECTOR(768), match_threshold FLOAT, match_count INT, user_id UUID)
+Returns: TABLE (id UUID, content TEXT, summary TEXT, created_at TIMESTAMP, similarity FLOAT)
+- Performs semantic search on journal entries
+- Uses vector embeddings for similarity
+- Supports configurable matching threshold
+- Returns matched entries with similarity scores
+
+### 4. get_dashboard_insights()
+sql
+Function: get_dashboard_insights(p_user_id UUID, p_days_back INT DEFAULT 90)
+Returns: JSONB
+Comprehensive analytics function providing:
+- Journal trends:
+  - Weekly journal counts
+  - Mood distribution
+  - Keyword analysis
+- Activity trends:
+  - Completion rates
+  - Difficulty ratings
+  - Category distribution
+- Summary insights:
+  - Total counts
+  - Most common moods
+  - Activity engagement
+
+## 🔒 Security Features
+
+### Row Level Security (RLS)
+- Enabled on all main tables:
+  - journals
+  - activities
+  - user_activities
+
+### Performance Optimizations
+sql
+Indexes:
+idx_journals_user_id
+idx_user_activities_user_id
+idx_journals_mood_tags (GIN)
+idx_journals_keywords (GIN)
+idx_journals_embedding (IVFFLAT)
+
+## 🔧 Vector Support
+- Enabled vector extension for semantic search
+- Uses 768-dimensional embeddings
+- Optimized for similarity searches
+
+## 📈 Data Analysis Features
+
+### Mood Analysis
+- Daily and weekly aggregations
+- Mood category distribution
+- Trend analysis over time
+
+### Activity Tracking
+- Completion rates
+- Difficulty progression
+- Category distribution
+- User engagement metrics
+
+### Journal Analytics
+- Semantic search capabilities
+- Keyword extraction
+- Mood pattern recognition
+- Content summarization
+
+## 🔄 Integration Points
+
+### AI Services
+- Vector embeddings for semantic search
+- Mood prediction from journal content
+- Content summarization
+- Keyword extraction
+
+### External Services
+- Location-based recommendations
+- Related article suggestions
+- Activity recommendations
+
+## 🚀 Performance Considerations
+
+### Optimized Queries
+- Uses CTEs for complex analytics
+- Efficient date-based grouping
+- Indexed text search capabilities
+- Vector similarity optimization
+
+### Data Aggregation
+- Weekly rollups for trends
+- Efficient JSON aggregation
+- Optimized mood analysis
+- Smart activity matching
+
+This documentation reflects the current database structure and functionality as defined in the migration file. The system is designed to provide comprehensive mental wellness tracking with AI-powered insights and recommendations.
+This updated documentation provides a detailed overview of the database structure and functions while maintaining consistency with the existing codebase. It includes all the key features from the migration file while presenting them in a clear, organized format.
+appl all of these to my read me 
+
+I'll help integrate the database documentation into your existing README.md while maintaining its current structure. Here's how we can enhance it:
+// ... existing code ...
 
 ## 📊 Database Schema Highlights
 
 ### Key Tables
-- `profiles`: Extended user information
-- `mood_entries`: Daily mood tracking
-- `journals`: User journal entries with embeddings
-- `activities`: Wellness activities
-- `achievements`: User progress tracking
+- `journals`: User journal entries with AI enhancements
+  - AI-powered insights: mood tags, embeddings, keywords
+  - Location integration: nearby places recommendations
+  - Related content: auto-linked articles
+  - Vector embeddings for semantic search (768 dimensions)
 
-## 🧠 AI-Powered Features
+- `activities`: Wellness activity catalog
+  - Difficulty levels: beginner/intermediate/advanced
+  - Mood-based recommendations
+  - Duration and category tracking
+  - Smart tagging system
 
-### Semantic Search Workflow
-1. Generate embedding for journal entries
-2. Store 768-dimensional vectors in Supabase
-3. Perform similarity search
-4. Generate context-aware responses
+- `user_activities`: Progress tracking
+  - Status: planned/in_progress/completed/skipped
+  - Personal reflections
+  - Difficulty ratings
+  - Completion timestamps
 
-### Empathetic Response Generation
-- Uses Gemini Pro for generating supportive messages
-- Considers user's mood, journal history, and current context
+### Core Functions
 
-## 🔒 Security Considerations
+#### Mood Analysis
+Function: get_mood_trends(p_user_id UUID)
+Returns: TABLE (entry_date DATE, mood_categories JSONB, total_entries BIGINT)
 
-- Supabase Row Level Security
-- Secure API routes
-- User-specific data access
-- Encryption of sensitive information
+- Analyzes mood patterns over time
+- Groups mood tags by date
+- Aggregates mood frequencies
+- Provides total entries per day
+
+### 2. get_recommended_activities()
+sql
+Function: get_recommended_activities(p_user_id UUID, p_current_mood_tags TEXT[])
+Returns: TABLE (activity_id UUID, title TEXT, description TEXT, match_score double precision)
+
+- Recommends activities based on current mood
+- Calculates mood-activity match scores
+- Uses intersection algorithm for matching
+- Returns top 5 matched activities
+
+### 3. match_journals()
+sql
+Function: match_journals(query_embedding VECTOR(768), match_threshold FLOAT, match_count INT, user_id UUID)
+Returns: TABLE (id UUID, content TEXT, summary TEXT, created_at TIMESTAMP, similarity FLOAT)
+
+- Performs semantic search on journal entries
+- Uses vector embeddings for similarity
+- Supports configurable matching threshold
+- Returns matched entries with similarity scores
+
+### 4. get_dashboard_insights()
+sql
+Function: get_dashboard_insights(p_user_id UUID, p_days_back INT DEFAULT 90)
+Returns: JSONB
+Comprehensive analytics function providing:
+- Journal trends:
+  - Weekly journal counts
+  - Mood distribution
+  - Keyword analysis
+- Activity trends:
+  - Completion rates
+  - Difficulty ratings
+  - Category distribution
+- Summary insights:
+  - Total counts
+  - Most common moods
+  - Activity engagement
+
+## 🔒 Security Features
+
+### Row Level Security (RLS)
+- Enabled on all main tables:
+  - journals
+  - activities
+  - user_activities
+
+### Performance Optimizations
+sql
+Indexes:
+idx_journals_user_id
+idx_user_activities_user_id
+idx_journals_mood_tags (GIN)
+idx_journals_keywords (GIN)
+idx_journals_embedding (IVFFLAT)
+
+
+## 🔧 Vector Support
+- Enabled vector extension for semantic search
+- Uses 768-dimensional embeddings
+- Optimized for similarity searches
+
+## 📈 Data Analysis Features
+
+### Mood Analysis
+- Daily and weekly aggregations
+- Mood category distribution
+- Trend analysis over time
+
+### Activity Tracking
+- Completion rates
+- Difficulty progression
+- Category distribution
+- User engagement metrics
+
+### Journal Analytics
+- Semantic search capabilities
+- Keyword extraction
+- Mood pattern recognition
+- Content summarization
+
+## 🔄 Integration Points
+
+### AI Services
+- Vector embeddings for semantic search
+- Mood prediction from journal content
+- Content summarization
+- Keyword extraction
+
+### External Services
+- Location-based recommendations
+- Related article suggestions
+- Activity recommendations
+
+## 🚀 Performance Considerations
+
+### Optimized Queries
+- Uses CTEs for complex analytics
+- Efficient date-based grouping
+- Indexed text search capabilities
+- Vector similarity optimization
+
+### Data Aggregation
+- Weekly rollups for trends
+- Efficient JSON aggregation
+- Optimized mood analysis
+- Smart activity matching
+
+This documentation reflects the current database structure and functionality as defined in the migration file. The system is designed to provide comprehensive mental wellness tracking with AI-powered insights and recommendations.
+
 
 ## 🚀 Deployment
 

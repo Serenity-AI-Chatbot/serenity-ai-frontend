@@ -19,11 +19,15 @@ export function ActivityRecommendations() {
 
   useEffect(() => {
     async function fetchActivities() {
-      if (!moodData) return
+      if (!moodData?.summaryInsights?.mostCommonMoods) return
       
       try {
-        const currentMood = moodData.chartData[moodData.chartData.length - 1]?.mood
-        const response = await fetch(`/api/recommended-activities?mood=${currentMood}`)
+        const currentMoodTags = Object.keys(moodData.summaryInsights.mostCommonMoods)
+        
+        const response = await fetch(
+          `/api/recommended-activities?mood_tags=${JSON.stringify(currentMoodTags)}`
+        )
+        
         if (!response.ok) throw new Error("Failed to fetch activities")
         const data = await response.json()
         setActivities(data)
@@ -38,6 +42,19 @@ export function ActivityRecommendations() {
   }, [moodData])
 
   if (loading) return <div>Loading recommendations...</div>
+
+  if (!activities.length) {
+    return (
+      <Card className="bg-white dark:bg-black">
+        <CardHeader>
+          <CardTitle className="text-gray-900 dark:text-emerald-500">Recommended Activities</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-600 dark:text-emerald-500/70">No activities found for your current mood.</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="bg-white dark:bg-black">

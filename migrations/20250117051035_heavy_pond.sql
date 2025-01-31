@@ -169,6 +169,20 @@ END;
 $$;
 
 -- Updated Dashboard Analytics Function
+/*
+  # Fix Dashboard Insights Function
+
+  1. Changes
+    - Fixed the ungrouped column error in the journal_analytics CTE
+    - Improved the query structure to properly handle grouping
+    - Maintained all existing functionality while fixing the grouping issue
+
+  2. Details
+    - Modified the journal_analytics CTE to properly group data
+    - Ensured all columns used in subqueries are properly grouped
+    - Maintained existing return structure and data format
+*/
+
 CREATE OR REPLACE FUNCTION get_dashboard_insights(
     p_user_id UUID, 
     p_days_back INT DEFAULT 90
@@ -185,7 +199,7 @@ BEGIN
         FROM journals
         WHERE user_id = p_user_id 
         AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
-        GROUP BY DATE_TRUNC('week', created_at), unnest(mood_tags)
+        GROUP BY DATE_TRUNC('week', created_at), mood
     ),
     
     keyword_counts AS (
@@ -196,27 +210,35 @@ BEGIN
         FROM journals
         WHERE user_id = p_user_id 
         AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
-        GROUP BY DATE_TRUNC('week', created_at), unnest(keywords)
+        GROUP BY DATE_TRUNC('week', created_at), keyword
     ),
     
     journal_analytics AS (
         SELECT 
-            DATE_TRUNC('week', j.created_at) AS week,
-            COUNT(*) AS journal_count,
+            weeks.week,
+            COUNT(j.*) AS journal_count,
             (
                 SELECT jsonb_object_agg(mood, count)
                 FROM mood_counts mc
-                WHERE mc.week = DATE_TRUNC('week', j.created_at)
+                WHERE mc.week = weeks.week
             ) AS mood_distribution,
             (
                 SELECT jsonb_object_agg(keyword, count)
                 FROM keyword_counts kc
-                WHERE kc.week = DATE_TRUNC('week', j.created_at)
+                WHERE kc.week = weeks.week
             ) AS keyword_distribution
-        FROM journals j
-        WHERE j.user_id = p_user_id 
-        AND j.created_at >= NOW() - (p_days_back || ' days')::INTERVAL
-        GROUP BY DATE_TRUNC('week', j.created_at)
+        FROM (
+            SELECT DISTINCT DATE_TRUNC('week', dd)::date AS week
+            FROM generate_series(
+                NOW() - (p_days_back || ' days')::INTERVAL,
+                NOW(),
+                '1 week'::interval
+            ) dd
+        ) weeks
+        LEFT JOIN journals j ON 
+            DATE_TRUNC('week', j.created_at) = weeks.week
+            AND j.user_id = p_user_id
+        GROUP BY weeks.week
     ),
     
     activity_analytics AS (

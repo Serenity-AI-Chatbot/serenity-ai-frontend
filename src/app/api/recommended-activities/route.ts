@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const currentMood = Number(searchParams.get('mood') || '5')
+  const moodTags = JSON.parse(searchParams.get('mood_tags') || '["neutral"]')
 
   try {
     // Create authenticated Supabase client using awaited cookies
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase.rpc('get_recommended_activities', {
       p_user_id: session.user.id,
-      p_current_mood: currentMood
+      p_current_mood_tags: moodTags
     })
 
     if (error) throw error
