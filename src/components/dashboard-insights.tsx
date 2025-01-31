@@ -3,23 +3,29 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts"
+import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Cell, Legend, Label } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useMoodStore } from "@/store/mood-store"
 
 const ACTIVITY_COLORS = ["#FF8042", "#00C49F", "#0088FE"]
 const MOOD_COLORS = ["#FFB6C1", "#FFD700", "#98FB98", "#87CEEB", "#DDA0DD"]
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background p-2 border border-border rounded shadow-md">
+        <p className="font-semibold">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} style={{ color: entry.fill }}>
+            {`${entry.name}: ${entry.value}`}
+          </p>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
 
 export function DashboardInsights() {
   const { moodData, loading, fetchMoodTrends } = useMoodStore()
@@ -61,10 +67,39 @@ export function DashboardInsights() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5)
 
+  const totalMoods = moodDistributionData.length
+
   const journalData = moodData.journalTrends.map((trend) => ({
     week: new Date(trend.week).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     journalCount: trend.journalCount,
   }))
+
+  const activityConfig = Object.fromEntries(
+    activityTypeData.map((item, index) => [
+      item.name,
+      {
+        label: item.name,
+        color: ACTIVITY_COLORS[index % ACTIVITY_COLORS.length],
+      },
+    ]),
+  )
+
+  const moodConfig = Object.fromEntries(
+    moodDistributionData.map((item, index) => [
+      item.name,
+      {
+        label: item.name,
+        color: MOOD_COLORS[index % MOOD_COLORS.length],
+      },
+    ]),
+  )
+
+  const journalConfig = {
+    journalCount: {
+      label: "Journal Entries",
+      color: "#8884d8",
+    },
+  }
 
   return (
     <div className="space-y-6">
@@ -89,17 +124,17 @@ export function DashboardInsights() {
             <CardTitle>Weekly Journal Entries</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <ChartContainer config={journalConfig} className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={journalData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="week" angle={-45} textAnchor="end" height={60} interval={0} tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="journalCount" fill="#8884d8" />
+                  <ChartTooltip content={<CustomTooltip />} />
+                  <Bar dataKey="journalCount" fill={journalConfig.journalCount.color} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -108,9 +143,10 @@ export function DashboardInsights() {
             <CardTitle>Activity Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <ChartContainer config={activityConfig} className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                   <Pie
                     data={activityTypeData}
                     cx="50%"
@@ -120,17 +156,44 @@ export function DashboardInsights() {
                     fill="#8884d8"
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {activityTypeData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={ACTIVITY_COLORS[index % ACTIVITY_COLORS.length]} />
                     ))}
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                          return (
+                            <text
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              <tspan
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                className="fill-foreground text-3xl font-bold"
+                              >
+                                {activityTypeData.reduce((sum, item) => sum + item.value, 0)}
+                              </tspan>
+                              <tspan
+                                x={viewBox.cx}
+                                y={(viewBox.cy || 0) + 24}
+                                className="fill-muted-foreground"
+                              >
+                                Total Activities
+                              </tspan>
+                            </text>
+                          )
+                        }
+                      }}
+                    />
                   </Pie>
-                  <Tooltip />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -139,9 +202,10 @@ export function DashboardInsights() {
             <CardTitle>Most Common Moods</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <ChartContainer config={moodConfig} className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                   <Pie
                     data={moodDistributionData}
                     cx="50%"
@@ -151,17 +215,44 @@ export function DashboardInsights() {
                     fill="#8884d8"
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {moodDistributionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={MOOD_COLORS[index % MOOD_COLORS.length]} />
                     ))}
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                          return (
+                            <text
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              <tspan
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                className="fill-foreground text-3xl font-bold"
+                              >
+                                {totalMoods.toLocaleString()}
+                              </tspan>
+                              <tspan
+                                x={viewBox.cx}
+                                y={(viewBox.cy || 0) + 24}
+                                className="fill-muted-foreground"
+                              >
+                                Total Moods
+                              </tspan>
+                            </text>
+                          )
+                        }
+                      }}
+                    />
                   </Pie>
-                  <Tooltip />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -196,4 +287,3 @@ export function DashboardInsights() {
     </div>
   )
 }
-

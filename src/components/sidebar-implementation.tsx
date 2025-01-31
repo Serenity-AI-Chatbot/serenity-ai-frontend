@@ -1,63 +1,56 @@
-"use client";
+"use client"
 
-import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
-import { 
-  Home,
-  MessageSquare,
-  LineChart,
-  Book,
-  Activity,
-  LogOut
-} from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
+import { Home, MessageSquare, LineChart, Book, Activity, LogOut } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function DashboardSidebar() {
-  const router = useRouter();
+  const router = useRouter()
 
   const sidebarLinks = [
     {
       label: "Home",
       href: "/dashboard",
-      icon: <Home className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
+      icon: <Home className="w-5 h-5 text-emerald-500" />,
     },
     {
       label: "Chat",
       href: "/chat",
-      icon: <MessageSquare className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
+      icon: <MessageSquare className="w-5 h-5 text-emerald-500" />,
     },
     {
       label: "Insights",
       href: "/insights",
-      icon: <LineChart className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
+      icon: <LineChart className="w-5 h-5 text-emerald-500" />,
     },
     {
       label: "Journal",
       href: "/journal",
-      icon: <Book className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
+      icon: <Book className="w-5 h-5 text-emerald-500" />,
     },
     {
       label: "Activity",
       href: "/activities",
-      icon: <Activity className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
-    }
-  ];
+      icon: <Activity className="w-5 h-5 text-emerald-500" />,
+    },
+  ]
 
   const handleSignOut = async () => {
     try {
-      const response = await fetch('/signout', {
-        method: 'POST',
+      const response = await fetch("/signout", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-      });
-      
+      })
+
       if (response.ok) {
-        router.push('/');
+        router.push("/")
       }
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error)
     }
-  };
+  }
 
   return (
     <Sidebar>
@@ -66,32 +59,24 @@ export function DashboardSidebar() {
           {/* Main navigation links */}
           <div className="flex flex-col gap-2">
             {sidebarLinks.map((link) => (
-              <SidebarLink 
-                key={link.href}
-                link={link}
-                className="hover:bg-emerald-500/40 rounded-md"
-              />
+              <SidebarLink key={link.href} link={link} />
             ))}
           </div>
-          
+
           {/* Sign out button at bottom */}
-          <div className="mb-4">
-            <div 
-              onClick={handleSignOut}
-              className="cursor-pointer"
-            >
-              <SidebarLink
-                link={{
-                  label: "Sign Out",
-                  href: "#",
-                  icon: <LogOut className="w-5 h-5 text-emerald-500 dark:text-emerald-500" />
-                }}
-                className="hover:bg-emerald-500/40 rounded-md"
-              />
-            </div>
+          <div>
+            <SidebarLink
+              link={{
+                label: "Sign Out",
+                href: "#",
+                icon: <LogOut className="w-5 h-5 text-emerald-500" />,
+              }}
+              className="hover:bg-red-500/10"
+            />
           </div>
         </div>
       </SidebarBody>
     </Sidebar>
-  );
+  )
 }
+

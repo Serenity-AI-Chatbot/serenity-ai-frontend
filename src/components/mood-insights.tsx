@@ -1,38 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  Legend,
-} from "recharts"
+import { useEffect, useState, useMemo } from "react"
+import { Bar, BarChart, Cell, Label, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { ChartContainer, ChartLegend, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useMoodStore } from "@/store/mood-store"
-
-// Color palette for moods
-const MOOD_COLORS = {
-  happy: "#FFB6C1",
-  excited: "#FFD700",
-  grateful: "#98FB98",
-  inspired: "#87CEEB",
-  connected: "#DDA0DD",
-  peaceful: "#B0E0E6",
-  determined: "#F08080",
-  anxious: "#D3D3D3",
-  hopeful: "#FFA07A",
-  creative: "#9370DB",
-  reflective: "#20B2AA",
-  curious: "#FF7F50",
-}
 
 const TIME_PERIODS = [
   { value: "30", label: "30 Days" },
@@ -42,6 +15,29 @@ const TIME_PERIODS = [
   { value: "365", label: "1 Year" },
 ] as const
 
+// Function to generate a random color
+function getRandomColor() {
+  const hue = Math.floor(Math.random() * 360)
+  return `hsl(${hue}, 70%, 50%)`
+}
+
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background p-2 border border-border rounded shadow-md">
+        <p className="font-semibold">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} style={{ color: entry.fill }}>
+            {`${entry.name}: ${entry.value}`}
+          </p>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
+
 export function MoodInsights() {
   const { moodData, loading, error, fetchMoodTrends } = useMoodStore()
   const [selectedDays, setSelectedDays] = useState<string>("90")
@@ -49,6 +45,16 @@ export function MoodInsights() {
   useEffect(() => {
     fetchMoodTrends(Number(selectedDays))
   }, [fetchMoodTrends, selectedDays])
+
+  const colorMap = useMemo(() => new Map<string, string>(), [])
+
+  // Function to get or generate a color for a given key
+  const getColor = (key: string) => {
+    if (!colorMap.has(key)) {
+      colorMap.set(key, getRandomColor())
+    }
+    return colorMap.get(key)!
+  }
 
   if (loading) {
     return (
@@ -90,9 +96,13 @@ export function MoodInsights() {
   const moodChartData = Object.entries(moodTotals)
     .map(([mood, count]) => ({
       mood,
-      count,
+      value: count,
+      fill: getColor(mood),
     }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 12) // Limit to top 12 moods for better visibility
+
+  const totalMoods = moodChartData.reduce((acc, curr) => acc + curr.value, 0)
 
   // Aggregate all keywords across weeks
   const keywordTotals = journalTrends.reduce(
@@ -113,9 +123,40 @@ export function MoodInsights() {
   const keywordChartData = Object.entries(keywordTotals)
     .map(([keyword, count]) => ({
       keyword,
-      count,
+      value: count,
+      fill: getColor(keyword),
     }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 12) // Limit to top 12 keywords
+
+  const totalKeywords = keywordChartData.reduce((acc, curr) => acc + curr.value, 0)
+
+  const moodConfig = Object.fromEntries(
+    moodChartData.map((item) => [
+      item.mood,
+      {
+        label: item.mood.charAt(0).toUpperCase() + item.mood.slice(1),
+        color: item.fill,
+      },
+    ]),
+  )
+
+  const keywordConfig = Object.fromEntries(
+    keywordChartData.map((item) => [
+      item.keyword,
+      {
+        label: item.keyword,
+        color: item.fill,
+      },
+    ]),
+  )
+
+  const journalConfig = {
+    journalCount: {
+      label: "Journal Entries",
+      color: getColor("journalCount"),
+    },
+  }
 
   return (
     <div className="space-y-8">
@@ -145,10 +186,9 @@ export function MoodInsights() {
           <CardTitle>Journal Entries per Week</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <ChartContainer config={journalConfig} className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={journalTrends}>
-                <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="week"
                   tickFormatter={(value) => new Date(value).toLocaleDateString()}
@@ -157,11 +197,11 @@ export function MoodInsights() {
                   height={70}
                 />
                 <YAxis />
-                <Tooltip labelFormatter={(value) => new Date(value).toLocaleDateString()} />
-                <Bar dataKey="journalCount" fill="#8884d8" />
+                <ChartTooltip content={<CustomTooltip />} />
+                <Bar dataKey="journalCount" fill={journalConfig.journalCount.color} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </CardContent>
       </Card>
 
@@ -170,30 +210,57 @@ export function MoodInsights() {
           <CardTitle>Mood Distribution</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px]">
+          <ChartContainer config={moodConfig} className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                 <Pie
                   data={moodChartData}
-                  dataKey="count"
+                  dataKey="value"
                   nameKey="mood"
                   cx="50%"
-                  cy="50%"
-                  outerRadius={150}
-                  label={({ mood, count, percent }) => `${mood} (${(percent * 100).toFixed(0)}%)`}
+                  cy="45%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={5}
                 >
                   {moodChartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={MOOD_COLORS[entry.mood as keyof typeof MOOD_COLORS] || `hsl(${index * 30}, 70%, 50%)`}
-                    />
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text
+                            x={viewBox.cx}
+                            y={viewBox.cy}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            <tspan
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              className="fill-foreground text-3xl font-bold"
+                            >
+                              {totalMoods.toLocaleString()}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 24}
+                              className="fill-muted-foreground"
+                            >
+                              Total Moods
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
                 </Pie>
-                <Tooltip formatter={(value, name) => [`${value} entries`, name]} />
-                <Legend />
+                <ChartLegend />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </CardContent>
       </Card>
 
@@ -202,30 +269,59 @@ export function MoodInsights() {
           <CardTitle>Keyword Distribution</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px]">
+          <ChartContainer config={keywordConfig} className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                 <Pie
                   data={keywordChartData}
-                  dataKey="count"
+                  dataKey="value"
                   nameKey="keyword"
                   cx="50%"
-                  cy="50%"
-                  outerRadius={150}
-                  label={({ keyword, count, percent }) => `${keyword} (${(percent * 100).toFixed(0)}%)`}
+                  cy="45%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={5}
                 >
                   {keywordChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={`hsl(${index * (360 / keywordChartData.length)}, 70%, 60%)`} />
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text
+                            x={viewBox.cx}
+                            y={viewBox.cy}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            <tspan
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              className="fill-foreground text-3xl font-bold"
+                            >
+                              {totalKeywords.toLocaleString()}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 24}
+                              className="fill-muted-foreground"
+                            >
+                              Total Keywords
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
                 </Pie>
-                <Tooltip formatter={(value, name) => [`${value} occurrences`, name]} />
-                <Legend />
+                <ChartLegend />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </CardContent>
       </Card>
     </div>
   )
 }
-
