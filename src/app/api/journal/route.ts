@@ -1,43 +1,59 @@
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from("journals")
-    .select("id, created_at, mood_score, content")
-    .order("created_at", { ascending: false })
+  try {
+    // Get authenticated user
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const { data: { session } } = await supabase.auth.getSession()
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const journals = data.map((journal) => ({
-    id: journal.id,
-    date: journal.created_at,
-    mood: `${getMoodEmoji(journal.mood_score)} ${getMoodLabel(journal.mood_score)}`,
-    entry: journal.content,
-  }))
-
-  return NextResponse.json(journals, {
-    headers: {
-      'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
-  })
-}
 
-function getMoodEmoji(score: number): string {
-  if (score >= 8) return "😊"
-  if (score >= 6) return "🙂"
-  if (score >= 4) return "😐"
-  if (score >= 2) return "🙁"
-  return "😢"
-}
+    // Fetch journals with all relevant fields
+    const { data, error } = await supabase
+      .from("journals")
+      .select(`
+        id,
+        user_id,
+        title,
+        content,
+        summary,
+        mood_tags,
+        keywords,
+        latest_articles,
+        nearby_places,
+        sentences,
+        created_at,
+        tags
+      `)
+      .eq('user_id', session.user.id)
+      .order("created_at", { ascending: false })
 
-function getMoodLabel(score: number): string {
-  if (score >= 8) return "Happy"
-  if (score >= 6) return "Good"
-  if (score >= 4) return "Neutral"
-  if (score >= 2) return "Sad"
-  return "Very Sad"
+    if (error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60'
+      }
+    })
+  } catch (error) {
+    console.error('Journal fetch error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch journals' },
+      { status: 500 }
+    )
+  }
 }
 

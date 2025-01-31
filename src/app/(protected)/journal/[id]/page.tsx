@@ -2,9 +2,23 @@ import { JournalDetail } from '@/components/journal/journal-detail';
 import { notFound } from 'next/navigation';
 
 async function getJournal(id: string) {
-  const res = await fetch(`http://localhost:3000/api/journal/${id}`);
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/journal/${id}`, {
+      cache: 'no-store'
+    });
+    
+    if (!res.ok) {
+      if (res.status === 404) {
+        return null;
+      }
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    
+    return res.json();
+  } catch (error) {
+    console.error('Error fetching journal:', error);
+    return null;
+  }
 }
 
 export default async function JournalPage({
@@ -22,7 +36,7 @@ export default async function JournalPage({
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">
-          Mental Wellness Journal
+          {journal.title || 'Mental Wellness Journal'}
         </h1>
         <JournalDetail journal={journal} />
       </div>
