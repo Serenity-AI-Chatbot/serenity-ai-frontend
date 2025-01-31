@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import {
   BarChart,
   Bar,
@@ -15,34 +15,64 @@ import {
   Legend,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useMoodStore } from "@/store/mood-store"
 
 // Color palette for moods
 const MOOD_COLORS = {
-  happy: "#FFB6C1", // pink
-  excited: "#FFD700", // gold
-  grateful: "#98FB98", // pale green
-  inspired: "#87CEEB", // sky blue
-  connected: "#DDA0DD", // plum
-  peaceful: "#B0E0E6", // powder blue
-  determined: "#F08080", // light coral
-  anxious: "#D3D3D3", // light gray
-  hopeful: "#FFA07A", // light salmon
-  creative: "#9370DB", // medium purple
-  reflective: "#20B2AA", // light sea green
-  curious: "#FF7F50", // coral
+  happy: "#FFB6C1",
+  excited: "#FFD700",
+  grateful: "#98FB98",
+  inspired: "#87CEEB",
+  connected: "#DDA0DD",
+  peaceful: "#B0E0E6",
+  determined: "#F08080",
+  anxious: "#D3D3D3",
+  hopeful: "#FFA07A",
+  creative: "#9370DB",
+  reflective: "#20B2AA",
+  curious: "#FF7F50",
 }
+
+const TIME_PERIODS = [
+  { value: "30", label: "30 Days" },
+  { value: "60", label: "60 Days" },
+  { value: "90", label: "90 Days" },
+  { value: "180", label: "6 Months" },
+  { value: "365", label: "1 Year" },
+] as const
 
 export function MoodInsights() {
   const { moodData, loading, error, fetchMoodTrends } = useMoodStore()
+  const [selectedDays, setSelectedDays] = useState<string>("90")
 
   useEffect(() => {
-    fetchMoodTrends()
-  }, [fetchMoodTrends])
+    fetchMoodTrends(Number(selectedDays))
+  }, [fetchMoodTrends, selectedDays])
 
-  if (loading) return <div>Loading mood insights...</div>
-  if (error) return <div>{error}</div>
-  if (!moodData) return <div>No mood data available</div>
+  if (loading) {
+    return (
+      <div className="flex h-[200px] items-center justify-center">
+        <div className="text-muted-foreground">Loading mood insights...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[200px] items-center justify-center">
+        <div className="text-destructive">{error}</div>
+      </div>
+    )
+  }
+
+  if (!moodData) {
+    return (
+      <div className="flex h-[200px] items-center justify-center">
+        <div className="text-muted-foreground">No mood data available</div>
+      </div>
+    )
+  }
 
   const journalTrends = moodData.journalTrends
 
@@ -57,16 +87,17 @@ export function MoodInsights() {
     {} as Record<string, number>,
   )
 
-  const moodChartData = Object.entries(moodTotals).map(([mood, count]) => ({
-    mood,
-    count,
-  }))
+  const moodChartData = Object.entries(moodTotals)
+    .map(([mood, count]) => ({
+      mood,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count)
 
   // Aggregate all keywords across weeks
   const keywordTotals = journalTrends.reduce(
     (acc, week) => {
       Object.entries(week.keywordDistribution).forEach(([keywords, count]) => {
-        // Split the keywords string and count each keyword
         keywords.split("\n").forEach((keyword) => {
           const cleanKeyword = keyword.replace(/^-\s*/, "").trim()
           if (cleanKeyword) {
@@ -84,10 +115,31 @@ export function MoodInsights() {
       keyword,
       count,
     }))
-    .sort((a, b) => b.count - a.count) // Sort by count in descending order
+    .sort((a, b) => b.count - a.count)
 
   return (
     <div className="space-y-8">
+      <div className="flex justify-center">
+        <ToggleGroup
+          type="single"
+          value={selectedDays}
+          onValueChange={(value) => {
+            if (value) setSelectedDays(value)
+          }}
+        >
+          {TIME_PERIODS.map((period) => (
+            <ToggleGroupItem
+              key={period.value}
+              value={period.value}
+              aria-label={`Show data for ${period.label}`}
+              className="px-4"
+            >
+              {period.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Journal Entries per Week</CardTitle>
@@ -105,7 +157,7 @@ export function MoodInsights() {
                   height={70}
                 />
                 <YAxis />
-                <Tooltip />
+                <Tooltip labelFormatter={(value) => new Date(value).toLocaleDateString()} />
                 <Bar dataKey="journalCount" fill="#8884d8" />
               </BarChart>
             </ResponsiveContainer>
@@ -128,7 +180,7 @@ export function MoodInsights() {
                   cx="50%"
                   cy="50%"
                   outerRadius={150}
-                  label={(entry) => entry.mood}
+                  label={({ mood, count, percent }) => `${mood} (${(percent * 100).toFixed(0)}%)`}
                 >
                   {moodChartData.map((entry, index) => (
                     <Cell
@@ -137,7 +189,7 @@ export function MoodInsights() {
                     />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name) => [`${value} entries`, name]} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -160,13 +212,13 @@ export function MoodInsights() {
                   cx="50%"
                   cy="50%"
                   outerRadius={150}
-                  label={(entry) => entry.keyword}
+                  label={({ keyword, count, percent }) => `${keyword} (${(percent * 100).toFixed(0)}%)`}
                 >
                   {keywordChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={`hsl(${index * (360 / keywordChartData.length)}, 70%, 60%)`} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name) => [`${value} occurrences`, name]} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
