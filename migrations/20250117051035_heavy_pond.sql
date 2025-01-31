@@ -1,7 +1,7 @@
 -- Enable the vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Journals Table (now includes mood tracking)
+-- Journals Table (enhanced with AI insights and location data)
 CREATE TABLE journals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id),
@@ -9,22 +9,24 @@ CREATE TABLE journals (
     -- Enhanced Journal Content
     title TEXT,
     content TEXT NOT NULL,
+    summary TEXT, -- AI-generated summary
     
     -- Mood Tracking Integration
-    mood_score INT CHECK (mood_score BETWEEN 1 AND 10),
-    mood_tags TEXT[], -- e.g., ['anxious', 'hopeful', 'tired']
+    mood_tags TEXT[], -- AI-predicted mood labels, e.g., ['anxious', 'hopeful', 'tired']
     
     -- AI-powered insights
-    sentiment_score FLOAT, 
-    sentiment_label TEXT,
     embedding VECTOR(768),
+    keywords TEXT[], -- Extracted keywords
+    latest_articles JSONB, -- Stores related articles in JSON format
+    nearby_places JSONB, -- Stores nearby places in JSON format
+    sentences TEXT[], -- Extracted sentences for analysis
     
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     tags TEXT[]
 );
 
--- Activities Catalog (remains the same as previous schema)
+-- Activities Catalog
 CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     
@@ -32,7 +34,7 @@ CREATE TABLE activities (
     description TEXT,
     category TEXT, 
     
-    recommended_mood_range INT4RANGE,
+    recommended_moods TEXT[], -- Changed from mood_range to match with mood_tags
     difficulty_level TEXT CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced')),
     estimated_duration INT,
     
@@ -63,8 +65,7 @@ CREATE OR REPLACE FUNCTION get_mood_trends(
 )
 RETURNS TABLE (
     entry_date DATE,
-    average_mood FLOAT,
-    mood_trend TEXT,
+    mood_categories JSONB,
     total_entries BIGINT
 ) LANGUAGE plpgsql AS $$
 BEGIN
@@ -72,32 +73,30 @@ BEGIN
     WITH daily_moods AS (
         SELECT 
             DATE(created_at) as entry_date,
-            AVG(mood_score)::FLOAT as daily_average,
+            mood_tags,
             COUNT(*) as entries
         FROM journals
         WHERE user_id = p_user_id 
-        GROUP BY DATE(created_at)
+        GROUP BY DATE(created_at), mood_tags
         ORDER BY DATE(created_at)
     )
     SELECT 
         dm.entry_date,
-        dm.daily_average as average_mood,
-        CASE 
-            WHEN dm.daily_average BETWEEN 1 AND 3 THEN 'Low'
-            WHEN dm.daily_average BETWEEN 4 AND 6 THEN 'Moderate'
-            WHEN dm.daily_average BETWEEN 7 AND 10 THEN 'High'
-            ELSE 'No Data'
-        END AS mood_trend,
-        dm.entries as total_entries
+        jsonb_object_agg(
+            unnest(dm.mood_tags),
+            COUNT(*)
+        ) as mood_categories,
+        SUM(dm.entries) as total_entries
     FROM daily_moods dm
+    GROUP BY dm.entry_date
     ORDER BY dm.entry_date;
 END;
 $$;
 
--- Recommended Activities Based on Mood
+-- Recommended Activities Based on Mood Tags
 CREATE OR REPLACE FUNCTION get_recommended_activities(
     p_user_id UUID, 
-    p_current_mood double precision
+    p_current_mood_tags TEXT[]
 )
 RETURNS TABLE (
     activity_id UUID,
@@ -111,20 +110,33 @@ BEGIN
         a.id,
         a.title,
         a.description,
-        CASE 
-            WHEN p_current_mood BETWEEN lower(a.recommended_mood_range) AND upper(a.recommended_mood_range) 
-            THEN 1.0 
-            ELSE 0.5 
-        END::double precision AS match_score
+        (
+            -- Calculate match score based on overlap between current mood tags and recommended moods
+            ARRAY_LENGTH(
+                ARRAY(
+                    SELECT UNNEST(a.recommended_moods)
+                    INTERSECT
+                    SELECT UNNEST(p_current_mood_tags)
+                ),
+                1
+            )::float / 
+            GREATEST(
+                ARRAY_LENGTH(a.recommended_moods, 1),
+                ARRAY_LENGTH(p_current_mood_tags, 1)
+            )::float
+        ) AS match_score
     FROM activities a
-    WHERE 
-        p_current_mood BETWEEN lower(a.recommended_mood_range) AND upper(a.recommended_mood_range)
+    WHERE EXISTS (
+        SELECT 1
+        FROM UNNEST(a.recommended_moods) rm
+        WHERE rm = ANY(p_current_mood_tags)
+    )
     ORDER BY match_score DESC
     LIMIT 5;
 END;
 $$;
 
--- Semantic Search Function for Journals
+-- Semantic Search Function for Journals (unchanged)
 CREATE OR REPLACE FUNCTION match_journals(
     query_embedding VECTOR(768), 
     match_threshold FLOAT, 
@@ -134,6 +146,7 @@ CREATE OR REPLACE FUNCTION match_journals(
 RETURNS TABLE (
     id UUID,
     content TEXT,
+    summary TEXT,
     created_at TIMESTAMP WITH TIME ZONE,
     similarity FLOAT
 )
@@ -144,6 +157,7 @@ BEGIN
     SELECT 
         journals.id,
         journals.content,
+        journals.summary,
         journals.created_at,
         1 - (journals.embedding <=> query_embedding) AS similarity
     FROM journals
@@ -154,7 +168,7 @@ BEGIN
 END;
 $$;
 
--- Comprehensive Dashboard Analytics Function
+-- Updated Dashboard Analytics Function
 CREATE OR REPLACE FUNCTION get_dashboard_insights(
     p_user_id UUID, 
     p_days_back INT DEFAULT 90
@@ -163,25 +177,20 @@ RETURNS JSONB LANGUAGE plpgsql AS $$
 DECLARE
     result JSONB;
 BEGIN
-    -- Comprehensive dashboard insights
     WITH journal_analytics AS (
         SELECT 
             DATE_TRUNC('week', created_at) AS week,
-            AVG(mood_score) AS avg_weekly_mood,
             COUNT(*) AS journal_count,
-            AVG(sentiment_score) AS avg_sentiment,
-            
-            -- Mood distribution
-            SUM(CASE WHEN mood_score BETWEEN 1 AND 3 THEN 1 ELSE 0 END) AS low_mood_count,
-            SUM(CASE WHEN mood_score BETWEEN 4 AND 6 THEN 1 ELSE 0 END) AS moderate_mood_count,
-            SUM(CASE WHEN mood_score BETWEEN 7 AND 10 THEN 1 ELSE 0 END) AS high_mood_count,
-            
-            -- Sentiment distribution
-            SUM(CASE WHEN sentiment_score < -0.5 THEN 1 ELSE 0 END) AS very_negative_count,
-            SUM(CASE WHEN sentiment_score BETWEEN -0.5 AND -0.1 THEN 1 ELSE 0 END) AS negative_count,
-            SUM(CASE WHEN sentiment_score BETWEEN -0.1 AND 0.1 THEN 1 ELSE 0 END) AS neutral_count,
-            SUM(CASE WHEN sentiment_score BETWEEN 0.1 AND 0.5 THEN 1 ELSE 0 END) AS positive_count,
-            SUM(CASE WHEN sentiment_score > 0.5 THEN 1 ELSE 0 END) AS very_positive_count
+            -- Aggregate mood tags
+            jsonb_object_agg(
+                unnest(mood_tags),
+                COUNT(*)
+            ) AS mood_distribution,
+            -- Extract keywords frequency
+            jsonb_object_agg(
+                unnest(keywords),
+                COUNT(*)
+            ) AS keyword_distribution
         FROM journals
         WHERE user_id = p_user_id 
           AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
@@ -206,18 +215,6 @@ BEGIN
           AND ua.completed_at >= NOW() - (p_days_back || ' days')::INTERVAL
         GROUP BY week
         ORDER BY week
-    ),
-    
-    mood_progression AS (
-        SELECT 
-            PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mood_score) AS mood_25th,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mood_score) AS mood_median,
-            PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mood_score) AS mood_75th,
-            MIN(mood_score) AS mood_min,
-            MAX(mood_score) AS mood_max
-        FROM journals
-        WHERE user_id = p_user_id 
-          AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
     )
     
     -- Compile final JSON result
@@ -226,21 +223,9 @@ BEGIN
             SELECT jsonb_agg(
                 jsonb_build_object(
                     'week', week,
-                    'avg_mood', avg_weekly_mood,
                     'journal_count', journal_count,
-                    'avg_sentiment', avg_sentiment,
-                    'mood_distribution', jsonb_build_object(
-                        'low', low_mood_count,
-                        'moderate', moderate_mood_count,
-                        'high', high_mood_count
-                    ),
-                    'sentiment_distribution', jsonb_build_object(
-                        'very_negative', very_negative_count,
-                        'negative', negative_count,
-                        'neutral', neutral_count,
-                        'positive', positive_count,
-                        'very_positive', very_positive_count
-                    )
+                    'mood_distribution', mood_distribution,
+                    'keyword_distribution', keyword_distribution
                 )
             )
             FROM journal_analytics
@@ -262,21 +247,32 @@ BEGIN
             FROM activity_analytics
         ),
         
-        'mood_progression', (
-            SELECT jsonb_build_object(
-                '25th_percentile', mood_25th,
-                'median', mood_median,
-                '75th_percentile', mood_75th,
-                'min_mood', mood_min,
-                'max_mood', mood_max
-            )
-            FROM mood_progression
-        ),
-        
         'summary_insights', jsonb_build_object(
-            'total_journals', (SELECT COUNT(*) FROM journals WHERE user_id = p_user_id AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL),
-            'total_activities', (SELECT COUNT(*) FROM user_activities WHERE user_id = p_user_id AND completed_at IS NOT NULL AND completed_at >= NOW() - (p_days_back || ' days')::INTERVAL),
-            'average_daily_mood', (SELECT AVG(mood_score) FROM journals WHERE user_id = p_user_id AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL)
+            'total_journals', (
+                SELECT COUNT(*) 
+                FROM journals 
+                WHERE user_id = p_user_id 
+                AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+            ),
+            'total_activities', (
+                SELECT COUNT(*) 
+                FROM user_activities 
+                WHERE user_id = p_user_id 
+                AND completed_at IS NOT NULL 
+                AND completed_at >= NOW() - (p_days_back || ' days')::INTERVAL
+            ),
+            'most_common_moods', (
+                SELECT jsonb_object_agg(mood, count)
+                FROM (
+                    SELECT unnest(mood_tags) as mood, COUNT(*) as count
+                    FROM journals
+                    WHERE user_id = p_user_id 
+                    AND created_at >= NOW() - (p_days_back || ' days')::INTERVAL
+                    GROUP BY unnest(mood_tags)
+                    ORDER BY count DESC
+                    LIMIT 5
+                ) top_moods
+            )
         )
     ) INTO result;
 
@@ -292,6 +288,9 @@ ALTER TABLE user_activities ENABLE ROW LEVEL SECURITY;
 -- Indexes for performance
 CREATE INDEX idx_journals_user_id ON journals(user_id);
 CREATE INDEX idx_user_activities_user_id ON user_activities(user_id);
+CREATE INDEX idx_journals_mood_tags ON journals USING gin(mood_tags);
+CREATE INDEX idx_journals_keywords ON journals USING gin(keywords);
+CREATE INDEX idx_journals_embedding ON journals USING ivfflat (embedding vector_cosine_ops);
 
--- Optional: Enable vector extension for embeddings
+-- Enable vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
