@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createClient } from "@supabase/supabase-js"
+import { cookies } from 'next/headers'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 // Initialize the Gemini model with proper error handling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
@@ -27,16 +29,36 @@ export async function POST(req: Request) {
     return new Response("Missing API key", { status: 500 })
   }
 
-  const { messages, userId } = await req.json()
+  const { messages } = await req.json()
 
+  // Get the authenticated user's session
+  const cookieStore = cookies()
+  const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore })
+  const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
+
+  if (sessionError || !session) {
+    return new Response(
+      JSON.stringify({
+        error: "Unauthorized",
+      }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+  }
+
+  const userId = session.user.id
   const model = genAI.getGenerativeModel({ model: "gemini-pro" })
 
   // Generate embedding for the latest user message
   const latestUserMessage = messages[messages.length - 1].content
   const queryEmbedding = await generateEmbedding(latestUserMessage)
 
-  // Fetch relevant journal entries with parameters in the correct order
-  const { data: journalEntries, error } = await supabase.rpc("match_journals", {
+  // Call the function with parameters in the correct order as defined in the function
+  const { data: journalEntries, error } = await supabase.rpc('match_journals', {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,
     match_count: 5,
@@ -45,7 +67,26 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("Error fetching journal entries:", error)
-    return new Response(`Error fetching journal entries: ${JSON.stringify(error)}`, { status: 500 })
+    return new Response(
+      JSON.stringify({
+        error: error,
+        details: {
+          queryEmbedding: queryEmbedding.length,
+          parameters: {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.5,
+            match_count: 5,
+            user_id: userId
+          }
+        }
+      }), 
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    )
   }
 
   // Add type safety for journal entries
@@ -58,21 +99,30 @@ export async function POST(req: Request) {
     tags: string[];
     keywords: string[];
     created_at: string;
+    similarity?: number;
   }
 
   // Prepare context from journal entries
+  console.log('Raw journal entries:', journalEntries);
+
   const journalContext = (journalEntries as JournalEntry[])
     .map(
-      (entry) =>
-        `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
+      (entry) => {
+        const formattedEntry = `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
     Title: ${entry.title}
     Content: ${entry.content}
     Summary: ${entry.summary}
     Mood Tags: ${entry.mood_tags.join(", ")}
     Tags: ${entry.tags.join(", ")}
-    Keywords: ${entry.keywords.join(", ")}`,
+    Keywords: ${entry.keywords.join(", ")}`
+        
+        console.log('Formatted entry:', formattedEntry);
+        return formattedEntry;
+      }
     )
     .join("\n\n")
+
+  console.log('Final journal context:', journalContext);
 
   // Create messages with the correct format, including journal context
   const geminiMessages = [
