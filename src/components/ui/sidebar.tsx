@@ -146,20 +146,25 @@ export const MobileSidebar = ({ className, children, ...props }: React.Component
   )
 }
 
-export const SidebarLink = ({
-  link,
-  className,
-  ...props
-}: {
-  link: Links
-  className?: string
-  props?: LinkProps
-}) => {
+interface SidebarLinkProps {
+  link: Links;
+  className?: string;
+  props?: LinkProps;
+  onClick?: () => void;
+}
+
+export function SidebarLink({ link, className, props, onClick }: SidebarLinkProps) {
   const { open, animate } = useSidebar()
   return (
     <Link
       href={link.href}
       className={cn("flex items-center justify-start gap-2 group/sidebar py-2", className)}
+      onClick={(e) => {
+        if (onClick) {  // Only prevent default if onClick handler exists
+          e.preventDefault()
+          onClick()
+        }
+      }}
       {...props}
     >
       {link.icon}

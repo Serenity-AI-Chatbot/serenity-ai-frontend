@@ -1,4 +1,4 @@
-# 🌿 MindfulPath: Personalized Mental Wellness Companion
+# 🌿 Serenity-AI: Personalized Mental Wellness Companion
 
 ## 📖 Project Overview
 

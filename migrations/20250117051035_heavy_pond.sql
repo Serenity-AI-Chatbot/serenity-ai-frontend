@@ -362,3 +362,26 @@ CREATE INDEX idx_journals_embedding ON journals USING ivfflat (embedding vector_
 
 -- Enable vector extension
 CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Row Level Security Policies
+-- Policy for user_activities table
+CREATE POLICY "Users can view their own activities"
+    ON user_activities
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own activities"
+    ON user_activities
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own activities"
+    ON user_activities
+    FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own activities"
+    ON user_activities
+    FOR DELETE
+    USING (auth.uid() = user_id);

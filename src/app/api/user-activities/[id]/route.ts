@@ -32,15 +32,19 @@ export async function PATCH(
       })
       .eq('id', id)
       .eq('user_id', session.user.id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error('[ACTIVITY_PATCH]', error);
       return new NextResponse('Failed to update activity', { status: 400 });
     }
 
-    return NextResponse.json(data);
+    // Check if any rows were updated
+    if (!data || data.length === 0) {
+      return new NextResponse('Activity not found or unauthorized', { status: 404 });
+    }
+
+    return NextResponse.json(data[0]);
   } catch (error) {
     console.error('[ACTIVITY_PATCH]', error);
     return new NextResponse('Internal Error', { status: 500 });

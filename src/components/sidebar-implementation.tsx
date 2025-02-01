@@ -42,11 +42,15 @@ export function DashboardSidebar() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
       })
 
-      if (response.ok) {
-        router.push("/")
+      if (!response.ok) {
+        throw new Error('Sign out failed')
       }
+      
+      // Force a page reload to reflect the signed-out state
+      window.location.href = '/'
     } catch (error) {
       console.error("Error signing out:", error)
     }
@@ -72,6 +76,7 @@ export function DashboardSidebar() {
                 icon: <LogOut className="w-5 h-5 text-emerald-500" />,
               }}
               className="hover:bg-red-500/10"
+              onClick={handleSignOut}
             />
           </div>
         </div>
