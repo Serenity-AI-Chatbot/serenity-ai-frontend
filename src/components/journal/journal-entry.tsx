@@ -10,15 +10,16 @@ const moods = ['😊 Happy', '😐 Neutral', '😢 Sad', '😰 Anxious', '😡 A
 export function JournalEntry() {
   const { toast } = useToast();
   const [entry, setEntry] = useState('');
+  const [title, setTitle] = useState('');
   const [selectedMood, setSelectedMood] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!entry.trim() || !selectedMood) {
+    if (!entry.trim() || !selectedMood || !title.trim()) {
       toast({
         title: 'Error',
-        description: 'Please fill in both the journal entry and mood',
+        description: 'Please fill in all fields (title, journal entry, and mood)',
         variant: 'destructive',
       });
       return;
@@ -26,23 +27,43 @@ export function JournalEntry() {
 
     setIsSubmitting(true);
     try {
-      // Simulate saving
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Submitting journal entry:', { title, content: entry });
       
+      const response = await fetch('/api/journal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          content: entry,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('API Response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save journal entry');
+      }
+
       toast({
         title: 'Success',
         description: 'Journal entry saved successfully!',
         variant: 'default',
       });
+      
+      // Reset form
       setEntry('');
+      setTitle('');
       setSelectedMood('');
     } catch (error) {
+      console.error('Error saving journal:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save journal entry',
+        description: error instanceof Error ? error.message : 'Failed to save journal entry',
         variant: 'destructive',
       });
-      console.error('Error:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -56,6 +77,23 @@ export function JournalEntry() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label
+            htmlFor="title"
+            className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2"
+          >
+            Title
+          </label>
+          <input
+            id="title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+            placeholder="Give your entry a title..."
+          />
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
             How are you feeling today?
