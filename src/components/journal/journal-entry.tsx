@@ -4,22 +4,18 @@ import { useState } from 'react';
 import { Pencil, Save } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast"
 
-
-const moods = ['😊 Happy', '😐 Neutral', '😢 Sad', '😰 Anxious', '😡 Angry'];
-
 export function JournalEntry() {
   const { toast } = useToast();
   const [entry, setEntry] = useState('');
   const [title, setTitle] = useState('');
-  const [selectedMood, setSelectedMood] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!entry.trim() || !selectedMood || !title.trim()) {
+    if (!entry.trim() || !title.trim()) {
       toast({
         title: 'Error',
-        description: 'Please fill in all fields (title, journal entry, and mood)',
+        description: 'Please fill in all fields (title and journal entry)',
         variant: 'destructive',
       });
       return;
@@ -56,7 +52,6 @@ export function JournalEntry() {
       // Reset form
       setEntry('');
       setTitle('');
-      setSelectedMood('');
     } catch (error) {
       console.error('Error saving journal:', error);
       toast({
@@ -92,29 +87,6 @@ export function JournalEntry() {
             className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
             placeholder="Give your entry a title..."
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
-            How are you feeling today?
-          </label>
-          <div className="flex flex-wrap gap-3">
-            {moods.map((mood) => (
-              <button
-                key={mood}
-                type="button"
-                onClick={() => setSelectedMood(mood)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors
-                  ${
-                    selectedMood === mood
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-gray-100 dark:bg-emerald-500/20 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/30'
-                  }`}
-              >
-                {mood}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div>
