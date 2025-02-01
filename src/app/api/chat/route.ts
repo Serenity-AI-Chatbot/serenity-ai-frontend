@@ -14,7 +14,7 @@ export const runtime = "edge"
 
 const SYSTEM_PROMPT = `You are an AI assistant for a mental wellness app called Serenity AI. Your primary goal is to help users improve their mental well-being. Respond with empathy, compassion, and understanding. Offer supportive advice, coping strategies, and gentle encouragement. If a user expresses severe distress or mentions self-harm, always recommend professional help. Remember, you're not a replacement for professional mental health care, but a supportive tool for users' day-to-day emotional well-being.
 
-You have access to the user's journal entries. Use this information to provide more personalized and context-aware responses. However, don't explicitly mention that you're using their journal entries unless they ask about it.`
+You have access to the user's journal entries. Use this information to provide more personalized and context-aware responses.`
 
 async function generateEmbedding(text: string): Promise<number[]> {
   const model = genAI.getGenerativeModel({ model: "embedding-001" })
@@ -102,8 +102,10 @@ export async function POST(req: Request) {
     similarity?: number;
   }
 
-  // Prepare context from journal entries
-  console.log('Raw journal entries:', journalEntries);
+  // // Prepare context from journal entries
+  // console.log("================================================")
+  // console.log('Raw journal entries:', journalEntries);
+  // console.log("================================================")
 
   const journalContext = (journalEntries as JournalEntry[])
     .map(
@@ -122,8 +124,10 @@ export async function POST(req: Request) {
     )
     .join("\n\n")
 
+  console.log("================================================")
   console.log('Final journal context:', journalContext);
-
+  console.log("Final journal context length:", journalContext.length);
+  console.log("================================================")
   // Create messages with the correct format, including journal context
   const geminiMessages = [
     {
