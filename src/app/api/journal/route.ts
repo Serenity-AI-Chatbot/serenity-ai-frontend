@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     const { title, content } = await request.json()
 
     // Call Flask API to process the journal content
-    const flaskResponse = await fetch('http://0.0.0.0:8000/journal', {
+    const flaskResponse = await fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
