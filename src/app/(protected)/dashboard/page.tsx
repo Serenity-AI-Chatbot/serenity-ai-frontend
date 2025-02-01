@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MoodInsights } from "@/components/mood-insights"
-import { QuickAccessCards } from "@/components/quick-access-cards"
 import { NavigationLinks } from "@/components/navigation-links"
 import { getUserName } from "@/lib/auth" // Assume this function exists to get the user's name
 
@@ -19,8 +18,6 @@ export default async function Home() {
           <MoodInsights />
         </CardContent>
       </Card>
-
-      <QuickAccessCards />
 
       <NavigationLinks />
     </div>
