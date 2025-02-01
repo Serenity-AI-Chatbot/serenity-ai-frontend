@@ -64,8 +64,6 @@ export async function POST(request: Request) {
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
     const { data: { session } } = await supabase.auth.getSession()
 
-    console.log('Session:', session)
-
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -75,10 +73,8 @@ export async function POST(request: Request) {
 
     // Get request body
     const { title, content } = await request.json()
-    console.log('Received data:', { title, content })
 
     // Call Flask API to process the journal content
-    console.log('Calling Flask API...')
     const flaskResponse = await fetch('http://0.0.0.0:8000/journal', {
       method: 'POST',
       headers: {
@@ -88,31 +84,47 @@ export async function POST(request: Request) {
     })
 
     if (!flaskResponse.ok) {
-      console.error('Flask API error:', await flaskResponse.text())
       throw new Error('Failed to process journal content')
     }
 
-    const flaskData = await flaskResponse.json()
-    console.log('Flask API response:', flaskData)
-
-    // Prepare journal data for Supabase with proper type checking
+    // Get raw response and parse it safely
+    const rawResponse = await flaskResponse.text()
+    console.log('Raw Flask API response:', rawResponse)
+    // Extract the JSON content from the response
+    // This handles the case where the response is wrapped in quotes
+    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Invalid JSON response format')
+    }
+    
+    let jsonStr = jsonMatch[0]
+      .replace(/\\n/g, '') // Remove escaped newlines
+      .replace(/\\r/g, '') // Remove escaped carriage returns
+      .replace(/\\/g, '') // Remove remaining backslashes
+      .replace(/"\{/g, '{') // Remove leading quote before curly brace
+      .replace(/\}"/g, '}') // Remove trailing quote after curly brace
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))) // Handle unicode escapes
+    
+    // Parse the cleaned JSON
+    const flaskData = JSON.parse(jsonStr)
+    console.log('Flask API Processed Data:', flaskData)
+    // Prepare journal data for Supabase
     const journalData = {
       user_id: session.user.id,
       title,
       content,
-      summary: flaskData.summary || null,
-      mood_tags: Array.isArray(flaskData.predictions) ? flaskData.predictions : null,
-      keywords: Array.isArray(flaskData.keywords) ? flaskData.keywords : null,
-      latest_articles: Array.isArray(flaskData.latest_articles) ? flaskData.latest_articles : null,
-      nearby_places: Array.isArray(flaskData.nearby_places) ? flaskData.nearby_places : null,
-      sentences: Array.isArray(flaskData.sentences) ? flaskData.sentences : null,
+      summary: flaskData.summary,
+      mood_tags: flaskData.predictions,
+      keywords: flaskData.keywords,
+      latest_articles: flaskData.latest_articles,
+      nearby_places: flaskData.nearby_places,
+      sentences: flaskData.sentences,
       created_at: new Date().toISOString()
     }
-
     console.log('Prepared journal data:', journalData)
 
     // Insert journal into Supabase
-    console.log('Inserting into Supabase...')
+    console.log('Inserting journal into Supabase...')
     const { data, error } = await supabase
       .from('journals')
       .insert([journalData])
@@ -127,7 +139,6 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('Successfully saved journal:', data)
     return NextResponse.json(data)
   } catch (error) {
     console.error('Journal creation error:', error)
@@ -137,4 +148,3 @@ export async function POST(request: Request) {
     )
   }
 }
-
