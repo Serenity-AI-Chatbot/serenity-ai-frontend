@@ -211,8 +211,10 @@ export async function POST(req: Request) {
       try {
         for await (const chunk of result.stream) {
           const text = chunk.text()
-          // Ensure we're sending the chunks in the correct format for the useChat hook
-          controller.enqueue(`data: ${JSON.stringify({ text })}\n\n`)
+          // Convert the string to bytes using TextEncoder
+          const encoder = new TextEncoder()
+          const bytes = encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+          controller.enqueue(bytes)
         }
         controller.close()
       } catch (error) {
