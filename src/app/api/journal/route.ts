@@ -6,10 +6,19 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 // Initialize the Gemini model
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
-// Helper function for generating embeddings
-async function generateEmbedding(text: string): Promise<number[]> {
+// Helper function for generating embeddings - updated to take full journal entry
+async function generateEmbedding(journalEntry: any): Promise<number[]> {
   const model = genAI.getGenerativeModel({ model: "embedding-001" })
-  const result = await model.embedContent(text)
+  // Combine relevant fields into a single text for embedding
+  const textForEmbedding = `
+    Title: ${journalEntry.title}
+    Content: ${journalEntry.content}
+    Summary: ${journalEntry.summary}
+    Mood Tags: ${journalEntry.mood_tags?.join(', ')}
+    Keywords: ${journalEntry.keywords?.join(', ')}
+    Tags: ${journalEntry.tags?.join(', ')}
+  `.trim()
+  const result = await model.embedContent(textForEmbedding)
   const embedding = result.embedding.values
   return embedding
 }
@@ -144,22 +153,29 @@ export async function POST(request: Request) {
     const flaskData = JSON.parse(jsonStr)
     console.log('Flask API Processed Data:', flaskData)
 
-    // Generate embedding using the helper function
-    const embedding = await generateEmbedding(content)
-    // console.log('Embedding:', embedding)
-    
     // Generate tags using the helper function
     const tags = await generateTags(content)
     console.log('Tags:', tags)
-    // Prepare journal data for Supabase
+
+    // First prepare the journal data without embedding
     const journalData = {
       user_id: session.user.id,
       title,
       content,
-      embedding,
       summary: flaskData.summary,
       mood_tags: flaskData.predictions,
       keywords: flaskData.keywords,
+      tags,
+      created_at: new Date().toISOString(),
+    }
+
+    // Generate embedding using the complete journal data
+    const embedding = await generateEmbedding(journalData)
+    
+    // Add embedding and remaining fields to journal data
+    const completeJournalData = {
+      ...journalData,
+      embedding,
       latest_articles: { articles: flaskData.latest_articles.map((article: any) => ({
         link: article.link,
         title: article.title,
@@ -173,16 +189,14 @@ export async function POST(request: Request) {
         user_ratings_total: place.user_ratings_total
       }))},
       sentences: flaskData.sentences,
-      created_at: new Date().toISOString(),
-      tags
     }
-    console.log('Prepared journal data:', journalData)
+    console.log('Complete Journal Data:', completeJournalData)
 
     // Insert journal into Supabase
     console.log('Inserting journal into Supabase...')
     const { data, error } = await supabase
       .from('journals')
-      .insert([journalData])
+      .insert([completeJournalData])
       .select()
       .single()
 
