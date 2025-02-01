@@ -23,6 +23,18 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return embedding
 }
 
+// Add interface for Activity type
+interface Activity {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  recommended_moods: string[];
+  difficulty_level: string;
+  estimated_duration: number;
+  tags: string[];
+}
+
 export async function POST(req: Request) {
   // Add error handling for missing API key
   if (!process.env.GEMINI_API_KEY) {
@@ -128,7 +140,40 @@ export async function POST(req: Request) {
   console.log('Final journal context:', journalContext);
   console.log("Final journal context length:", journalContext.length);
   console.log("================================================")
-  // Create messages with the correct format, including journal context
+
+  // After fetching journal entries, fetch activities
+  const { data: activities, error: activitiesError } = await supabase
+    .from('activities')
+    .select('*')
+
+  if (activitiesError) {
+    console.error("Error fetching activities:", activitiesError)
+    return new Response(JSON.stringify({ error: activitiesError }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  console.log("================================================")
+  console.log('Activities:', activities);
+  console.log("Activities length:", activities.length);
+  console.log("================================================")
+
+  // Format activities into a readable context
+  const activitiesContext = (activities as Activity[])
+    .map(activity => {
+      return `Activity:
+    Title: ${activity.title}
+    Description: ${activity.description}
+    Category: ${activity.category}
+    Recommended Moods: ${activity.recommended_moods.join(", ")}
+    Difficulty: ${activity.difficulty_level}
+    Duration: ${activity.estimated_duration} minutes
+    Tags: ${activity.tags.join(", ")}`
+    })
+    .join("\n\n")
+
+  // Create messages with both journal and activities context
   const geminiMessages = [
     {
       role: "user",
@@ -142,7 +187,7 @@ export async function POST(req: Request) {
       role: "user",
       parts: [
         {
-          text: `Here are some relevant journal entries for context:\n\n${journalContext}\n\nPlease keep these in mind when responding to the user.`,
+          text: `Here are some relevant journal entries for context:\n\n${journalContext}\n\nAnd here are all available activities you can recommend:\n\n${activitiesContext}\n\nPlease keep these in mind when responding to the user.`,
         },
       ],
     },
