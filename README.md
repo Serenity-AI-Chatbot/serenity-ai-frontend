@@ -12,6 +12,75 @@ Serenity AI  is a comprehensive mental health application designed to support us
 - Gamification of mental wellness
 - Emergency support features
 
+
+#### Backend FastAPI Repository  
+https://github.com/Serenity-AI-Chatbot/serenity-ai-ml
+
+## 📸 Project Media
+
+### Demo Video
+[![Serenity AI Demo](https://img.youtube.com/vi/Pkly11LDIlI/0.jpg)](https://www.youtube.com/watch?v=Pkly11LDIlI)
+
+### Architecture Diagram
+![Architecture Diagram](https://github.com/user-attachments/assets/094af6ae-3170-4ecf-9324-f16ce599084a))
+
+### System Flow
+![System Flow](https://github.com/user-attachments/assets/f21afabd-40d0-4752-8be0-12ea9f2c2239))
+
+### Screenshots
+
+### Home Page
+![Home Page](https://github.com/user-attachments/assets/444e8467-a4ec-4a79-8526-573e322cbe24)
+-Interative 3D model of a robot
+
+
+#### Dashboard
+![Dashboard](https://github.com/user-attachments/assets/24c6ff1c-aff9-40c1-a810-cbe1648ad0d5)
+- Activity tracking
+- Mood trends
+- Journal insights
+- Recommended activities
+
+#### Journal Interface
+![Journal Interface](https://github.com/user-attachments/assets/90be097d-d44f-4b6a-a283-cde54da37324)
+- AI-powered journaling
+- Emotion detection
+- Real-time insights
+- Tag suggestions
+
+#### Activity Recommendations
+![Activity Recommendations](https://github.com/user-attachments/assets/091e6382-496b-4caf-9cd4-6808b1fc5328)
+- Personalized suggestions
+- Difficulty levels
+- Progress tracking
+- Achievement system
+
+### Character Interface
+![Character Interface](https://github.com/user-attachments/assets/c46e663d-ce29-4b1c-9a00-e75992bd0cc8)
+- Interactive Chat Bot which can be used to talk to the user
+- with all the context of the user's mood and journal entries
+
+
+### Project Structure
+```
+docs/
+├── images/
+│   ├── architecture.png
+│   ├── system-flow.png
+│   ├── wireframes/
+│   │   ├── dashboard.png
+│   │   ├── journal.png
+│   │   ├── mood-tracking.png
+│   │   └── activities.png
+│   └── screenshots/
+│       ├── mobile-dashboard.png
+│       ├── mobile-journal.png
+│       ├── mobile-activities.png
+│       ├── desktop-dashboard.png
+│       └── desktop-journal.png
+└── README.md
+```
+
 ## 🛠 Tech Stack
 
 ### Frontend
@@ -21,9 +90,15 @@ Serenity AI  is a comprehensive mental health application designed to support us
 - Vercel Deployment
 
 ### Backend
-- Flask API
+- FastAPI ML Service
 - Supabase Authentication & Database
 - Google Gemini AI (Embeddings & Language Model)
+
+### ML Infrastructure
+- Custom ML Model (AWS EC2)
+- Spacy & NLTK Models
+- Vector Embeddings
+- Sentiment Analysis Pipeline
 
 ### Database
 - Supabase Postgres
@@ -36,6 +111,7 @@ Serenity AI  is a comprehensive mental health application designed to support us
 - Node.js 18+
 - Supabase Account
 - Google AI Studio API Key
+- AWS Account (for EC2)
 - Vercel Account (optional)
 
 ## 📦 Project Structure
@@ -49,12 +125,15 @@ mental-health-app/
 │   ├── lib/
 │   └── styles/
 │
-├── backend/                 # Flask API
-│   ├── app.py
-│   ├── services/
-│   │   ├── gemini_service.py
-│   │   └── supabase_service.py
-│   └── utils/
+├── ml-service/             # FastAPI ML Service
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── models/
+│   │   │   ├── custom_model.py
+│   │   │   └── nlp_models.py
+│   │   ├── routers/
+│   │   └── utils/
+│   └── requirements.txt
 │
 ├── database/                # Supabase Migrations & Functions
 │   ├── migrations/
@@ -88,21 +167,8 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 3. Backend Flask API Setup
 
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the Flask server
-python app.py
-```
-
-### 4. Frontend Next.js Setup
+### 3. Frontend Next.js Setup
 
 ```bash
 # Install dependencies
@@ -112,6 +178,36 @@ npm install
 # Run development server
 npm run dev
 ```
+
+### 4. ML Service Setup (AWS EC2)
+
+```bash
+# SSH into EC2 instance
+ssh -i "your-key.pem" ubuntu@your-ec2-instance
+
+# Clone repository and navigate to ml-service
+git clone <repository-url>
+cd mental-health-app/ml-service
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run FastAPI server with PM2
+pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 8000" --name ml-service
+```
+
+#### ML Service Environment Variables
+```bash
+MODEL_PATH=/path/to/custom/model
+SPACY_MODEL=en_core_web_lg
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+```
+
 ## 📊 Database Schema
 
 ### Core Tables
@@ -261,7 +357,6 @@ This updated documentation provides a detailed overview of the database structur
 appl all of these to my read me 
 
 I'll help integrate the database documentation into your existing README.md while maintaining its current structure. Here's how we can enhance it:
-// ... existing code ...
 
 ## 📊 Database Schema Highlights
 
@@ -405,18 +500,6 @@ idx_journals_embedding (IVFFLAT)
 This documentation reflects the current database structure and functionality as defined in the migration file. The system is designed to provide comprehensive mental wellness tracking with AI-powered insights and recommendations.
 
 
-## 🚀 Deployment
-
-### Frontend (Vercel)
-```bash
-vercel deploy
-```
-
-### Backend (Recommended: Railway/Render)
-- Deploy Flask API
-- Set environment variables
-- Configure CORS
-
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -440,23 +523,3 @@ For issues, please open a GitHub issue or contact support@mindfullpath.com
 - [ ] Advanced machine learning models
 - [ ] Integration with health tracking devices
 - [ ] Professional therapist marketplace
-
-## 📦 Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/mindfullpath.git
-
-# Setup backend
-cd backend
-pip install -r requirements.txt
-
-# Setup frontend
-cd ../frontend
-npm install
-
-# Run both simultaneously
-npm run dev:full
-```
-
-**Happy Mental Wellness Tracking! 🧘‍♀️✨**
