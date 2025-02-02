@@ -163,8 +163,6 @@ npm run dev
 ### 4. ML Service Setup (AWS EC2)
 
 ```bash
-# SSH into EC2 instance
-ssh -i "your-key.pem" ubuntu@your-ec2-instance
 
 # Clone repository and navigate to ml-service
 git clone <repository-url>
