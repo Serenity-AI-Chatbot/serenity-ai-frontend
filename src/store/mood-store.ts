@@ -32,7 +32,9 @@ interface MoodStore {
 }
 
 export const useMoodStore = create<MoodStore>((set) => ({
-  moodData: JSON.parse(localStorage.getItem('moodData') || 'null'),
+  moodData: typeof window !== 'undefined' 
+    ? JSON.parse(localStorage.getItem('moodData') || 'null')
+    : null,
   loading: true,
   error: null,
   fetchMoodTrends: async (daysBack = 30) => {
@@ -43,7 +45,9 @@ export const useMoodStore = create<MoodStore>((set) => ({
         throw new Error("Failed to fetch mood insights")
       }
       const data = await response.json()
-      localStorage.setItem('moodData', JSON.stringify(data))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('moodData', JSON.stringify(data))
+      }
       set({ moodData: data, error: null })
     } catch (err) {
       set({ error: "Error fetching mood insights" })
