@@ -385,3 +385,14 @@ CREATE POLICY "Users can delete their own activities"
     ON user_activities
     FOR DELETE
     USING (auth.uid() = user_id);
+
+-- Policy for journals table
+CREATE POLICY "Users can view their own journals"
+    ON journals
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own journals"
+    ON journals
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);

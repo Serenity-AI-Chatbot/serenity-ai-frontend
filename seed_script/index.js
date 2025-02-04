@@ -11,7 +11,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Constants
-const USER_ID = '6b92d5c4-1034-44fd-8653-0f40b478d621';
+const USER_ID = '9d748057-818c-4368-afe2-965cb0621f67';
 const EMBEDDING_MODEL = 'embedding-001';
 
 // Utility function to generate embeddings
