@@ -38,8 +38,9 @@ export async function requireAuth() {
   const supabase = getSupabaseAuthClient()
   const { data: { session }, error } = await supabase.auth.getSession()
   
+  // Instead of throwing an error, return null session
   if (error || !session) {
-    throw new Error('Unauthorized')
+    return { supabase, session: null }
   }
 
   // Cache the successful response
