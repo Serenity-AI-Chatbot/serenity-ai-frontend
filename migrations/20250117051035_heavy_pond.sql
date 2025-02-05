@@ -136,15 +136,16 @@ BEGIN
 END;
 $$;
 
--- Drop the old function if it exists
+-- Drop the old function
 DROP FUNCTION IF EXISTS match_journals;
 
--- Create a new function with explicit parameter names
+-- Create updated function with date parameter
 CREATE OR REPLACE FUNCTION match_journals(
     query_embedding VECTOR(768),
     match_threshold FLOAT,
     match_count INTEGER,
-    user_id UUID
+    user_id UUID,
+    target_date DATE DEFAULT NULL
 )
 RETURNS TABLE (
     id UUID,
@@ -172,11 +173,22 @@ BEGIN
         j.tags,
         j.keywords,
         j.created_at,
-        1 - (j.embedding <=> query_embedding) AS similarity
+        CASE 
+            WHEN target_date IS NOT NULL THEN
+                -- Prioritize exact date matches with a perfect similarity score
+                CASE WHEN DATE(j.created_at) = target_date THEN 1.0
+                ELSE 1 - (j.embedding <=> query_embedding)
+                END
+            ELSE 1 - (j.embedding <=> query_embedding)
+        END AS similarity
     FROM journals j
     WHERE j.user_id = match_journals.user_id
-    AND 1 - (j.embedding <=> query_embedding) > match_journals.match_threshold
-    ORDER BY similarity DESC
+    AND (
+        target_date IS NULL 
+        OR DATE(j.created_at) = target_date
+        OR 1 - (j.embedding <=> query_embedding) > match_journals.match_threshold
+    )
+    ORDER BY similarity DESC, created_at DESC
     LIMIT match_journals.match_count;
 END;
 $$;

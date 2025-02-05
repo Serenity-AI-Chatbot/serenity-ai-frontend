@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { getSupabaseAuthClient, requireAuth, supabase } from "@/lib/supabase-server"
+import { requireAuth, supabase } from "@/lib/supabase-server"
+import { parse, format } from 'date-fns'
 
 // Initialize the Gemini model with proper error handling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
@@ -48,12 +49,34 @@ export async function POST(req: Request) {
   const latestUserMessage = messages[messages.length - 1].content
   const queryEmbedding = await generateEmbedding(latestUserMessage)
 
-  // Call the function with parameters in the correct order as defined in the function
+  // Extract date from user message if present
+  let targetDate: string | null = null
+  const dateRegex = /(?:on\s+)?([A-Za-z]+day,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+  const dateMatch = latestUserMessage.match(dateRegex)
+
+  if (dateMatch) {
+    try {
+      const dateStr = dateMatch[1].trim()
+      const parsedDate = parse(dateStr, 'EEEE, MMMM d, yyyy', new Date())
+      targetDate = format(parsedDate, 'yyyy-MM-dd')
+      
+      console.log("================================================")
+      console.log("Parsed date:", { dateStr, targetDate })
+      console.log("================================================")
+
+    } catch (error) { 
+      console.error("Error parsing date:", error)
+      targetDate = null
+    }
+  }
+
+  // Call the updated function with the date parameter
   const { data: journalEntries, error } = await supabase.rpc('match_journals', {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,
     match_count: 5,
-    user_id: userId
+    user_id: userId,
+    target_date: targetDate
   })
 
   console.log("================================================")
@@ -97,11 +120,6 @@ export async function POST(req: Request) {
     similarity?: number;
   }
 
-  // // Prepare context from journal entries
-  // console.log("================================================")
-  // console.log('Raw journal entries:', journalEntries);
-  // console.log("================================================")
-
   const journalContext = (journalEntries as JournalEntry[])
     .map(
       (entry) => {
@@ -113,7 +131,6 @@ export async function POST(req: Request) {
     Tags: ${entry.tags.join(", ")}
     Keywords: ${entry.keywords.join(", ")}`
         
-        console.log('Formatted entry:', formattedEntry);
         return formattedEntry;
       }
     )
