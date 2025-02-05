@@ -408,3 +408,97 @@ CREATE POLICY "Users can insert their own journals"
     ON journals
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
+
+-- Create a function to get journals by month and year
+CREATE OR REPLACE FUNCTION get_journals_by_date(
+    p_user_id UUID,
+    p_year INT DEFAULT NULL,
+    p_month INT DEFAULT NULL,
+    p_limit INT DEFAULT 50
+)
+RETURNS TABLE (
+    id UUID,
+    title TEXT,
+    content TEXT,
+    summary TEXT,
+    mood_tags TEXT[],
+    tags TEXT[],
+    keywords TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE
+) LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        j.id,
+        j.title,
+        j.content,
+        j.summary,
+        j.mood_tags,
+        j.tags,
+        j.keywords,
+        j.created_at
+    FROM journals j
+    WHERE j.user_id = get_journals_by_date.p_user_id
+    AND (
+        p_year IS NULL OR 
+        EXTRACT(YEAR FROM j.created_at) = p_year
+    )
+    AND (
+        p_month IS NULL OR 
+        EXTRACT(MONTH FROM j.created_at) = p_month
+    )
+    ORDER BY j.created_at DESC
+    LIMIT p_limit;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION get_journals_by_date TO authenticated;
+GRANT EXECUTE ON FUNCTION get_journals_by_date TO service_role;
+
+-- Create a function to get journal statistics by time period
+CREATE OR REPLACE FUNCTION get_journal_stats_by_period(
+    p_user_id UUID,
+    p_start_date DATE,
+    p_end_date DATE
+)
+RETURNS TABLE (
+    period_start DATE,
+    entry_count BIGINT,
+    mood_distribution JSONB,
+    top_keywords TEXT[]
+) LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH mood_stats AS (
+        SELECT 
+            DATE_TRUNC('day', created_at)::DATE as entry_date,
+            COUNT(*) as daily_entries,
+            jsonb_object_agg(
+                mood, COUNT(*)
+            ) as daily_moods,
+            array_agg(DISTINCT keyword) as daily_keywords
+        FROM journals,
+        LATERAL unnest(mood_tags) as mood,
+        LATERAL unnest(keywords) as keyword
+        WHERE user_id = p_user_id
+        AND created_at::DATE BETWEEN p_start_date AND p_end_date
+        GROUP BY DATE_TRUNC('day', created_at)::DATE
+    )
+    SELECT 
+        ms.entry_date,
+        ms.daily_entries,
+        ms.daily_moods,
+        ms.daily_keywords
+    FROM mood_stats ms
+    ORDER BY ms.entry_date;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION get_journal_stats_by_period TO authenticated;
+GRANT EXECUTE ON FUNCTION get_journal_stats_by_period TO service_role;

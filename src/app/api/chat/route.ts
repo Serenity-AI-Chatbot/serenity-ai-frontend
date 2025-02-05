@@ -31,6 +31,13 @@ interface Activity {
   tags: string[];
 }
 
+// Add new date-related regex patterns
+const datePatterns = {
+  monthYear: /(?:in|during|for)\s+(?:([A-Za-z]+)\s+)?(\d{4})?/i,
+  dateRange: /(?:between|from)\s+(.+?)\s+(?:to|and|until)\s+(.+)/i,
+  specificDate: /(?:on\s+)?([A-Za-z]+day,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4})/i
+};
+
 export async function POST(req: Request) {
   // Add error handling for missing API key
   if (!process.env.GEMINI_API_KEY) {
@@ -49,39 +56,95 @@ export async function POST(req: Request) {
   const latestUserMessage = messages[messages.length - 1].content
   const queryEmbedding = await generateEmbedding(latestUserMessage)
 
-  // Extract date from user message if present
-  let targetDate: string | null = null
-  const dateRegex = /(?:on\s+)?([A-Za-z]+day,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4})/i
-  const dateMatch = latestUserMessage.match(dateRegex)
+  let journalEntries;
+  let error;
 
-  if (dateMatch) {
-    try {
-      const dateStr = dateMatch[1].trim()
-      const parsedDate = parse(dateStr, 'EEEE, MMMM d, yyyy', new Date())
-      targetDate = format(parsedDate, 'yyyy-MM-dd')
-      
-      console.log("================================================")
-      console.log("Parsed date:", { dateStr, targetDate })
-      console.log("================================================")
+  // Check for month/year pattern first
+  const monthYearMatch = latestUserMessage.match(datePatterns.monthYear);
+  if (monthYearMatch) {
+    const monthStr = monthYearMatch[1];
+    const yearStr = monthYearMatch[2];
 
-    } catch (error) { 
-      console.error("Error parsing date:", error)
-      targetDate = null
+    console.log("================================================")
+    console.log('monthStr:', monthStr);
+    console.log('yearStr:', yearStr);
+    console.log("================================================")
+    
+    let targetMonth: number | null = null;
+    let targetYear: number | null = null;
+
+    if (monthStr) {
+      try {
+        const date = new Date(`${monthStr} 1, 2000`);
+        if (!isNaN(date.getTime())) {
+          targetMonth = date.getMonth() + 1;
+        }
+      } catch (e) {
+        console.error("Error parsing month:", e);
+      }
     }
+    
+    if (yearStr) {
+      targetYear = parseInt(yearStr);
+    }
+
+    console.log("================================================")
+    console.log('targetMonth:', targetMonth);
+    console.log('targetYear:', targetYear);
+    console.log("================================================")
+    
+    // Use the new function for month/year queries
+    const response = await supabase.rpc('get_journals_by_date', {
+      p_user_id: userId,
+      p_year: targetYear,
+      p_month: targetMonth
+    });
+    
+    journalEntries = response.data;
+
+    console.log("================================================")
+    console.log('get_journals_by_date rpc response:', journalEntries);
+    console.log("================================================")
+
+    error = response.error;
+  } else {
+    // Check for specific date pattern
+    const dateMatch = latestUserMessage.match(datePatterns.specificDate);
+    console.log("================================================")
+    console.log('dateMatch:', dateMatch);
+    console.log("================================================")
+    let targetDate: string | null = null;
+
+    if (dateMatch) {
+      try {
+        const dateStr = dateMatch[1].trim();
+        const parsedDate = parse(dateStr, 'EEEE, MMMM d, yyyy', new Date());
+        targetDate = format(parsedDate, 'yyyy-MM-dd');
+      } catch (e) {
+        console.error("Error parsing date:", e);
+      }
+    }
+    
+    console.log("================================================")
+    console.log('targetDate:', targetDate);
+    console.log("================================================")
+
+
+    // Use the match_journals function for semantic search or specific date
+    const response = await supabase.rpc('match_journals', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: 5,
+      user_id: userId,
+      target_date: targetDate
+    });
+    
+    journalEntries = response.data;
+    console.log("================================================")
+    console.log('match_journals rpc response:', journalEntries);
+    console.log("================================================")
+    error = response.error;
   }
-
-  // Call the updated function with the date parameter
-  const { data: journalEntries, error } = await supabase.rpc('match_journals', {
-    query_embedding: queryEmbedding,
-    match_threshold: 0.5,
-    match_count: 5,
-    user_id: userId,
-    target_date: targetDate
-  })
-
-  console.log("================================================")
-  console.log('match_journals rpc response:', journalEntries);
-  console.log("================================================")
 
   if (error) {
     console.error("Error fetching journal entries:", error)
