@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { log } from "console"
 
 // Admin client for database operations (no auth needed)
 export const supabase = createClient(
@@ -15,7 +14,8 @@ let authClient: ReturnType<typeof createRouteHandlerClient> | null = null
 // Get or create auth client
 export function getSupabaseAuthClient() {
   if (!authClient) {
-    authClient = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    authClient = createRouteHandlerClient({ cookies: () => cookieStore })
   }
   return authClient
 }
@@ -35,7 +35,7 @@ export async function requireAuth() {
 
     return { session, error: null }
   } catch (err) {
-    console.error('Unexpected error in requireAuth:', err)
+    console.log('Unexpected error in requireAuth:', err)
     return { session: null, error: 'Unauthorized' }
   }
 }

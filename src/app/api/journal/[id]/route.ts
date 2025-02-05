@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAuth, supabase } from "@/lib/supabase-server";
+import { supabase } from "@/lib/supabase-server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { session } = await requireAuth()
-
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 })
-  }
 
   const { data, error } = await supabase
     .from("journals")
