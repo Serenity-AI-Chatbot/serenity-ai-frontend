@@ -59,39 +59,39 @@ CREATE TABLE user_activities (
     reflection TEXT
 );
 
--- Modified Mood Trend Analysis Function
+-- Modified Mood Trend Analysis Function without nested aggregates
 CREATE OR REPLACE FUNCTION get_mood_trends(
     p_user_id UUID
 )
 RETURNS TABLE (
     entry_date DATE,
-    mood_categories JSONB,
-    total_entries BIGINT
+    moods JSONB,
+    entry_count BIGINT
 ) LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
-    WITH daily_moods AS (
+    WITH mood_counts AS (
         SELECT 
             DATE(created_at) as entry_date,
-            mood_tags,
-            COUNT(*) as entries
+            unnest(mood_tags) as mood,
+            COUNT(*) as mood_count
         FROM journals
-        WHERE user_id = p_user_id 
-        GROUP BY DATE(created_at), mood_tags
-        ORDER BY DATE(created_at)
+        WHERE user_id = p_user_id
+        GROUP BY DATE(created_at), unnest(mood_tags)
     )
     SELECT 
-        dm.entry_date,
-        jsonb_object_agg(
-            unnest(dm.mood_tags),
-            COUNT(*)
-        ) as mood_categories,
-        SUM(dm.entries) as total_entries
-    FROM daily_moods dm
-    GROUP BY dm.entry_date
-    ORDER BY dm.entry_date;
+        mc.entry_date,
+        jsonb_object_agg(mc.mood, mc.mood_count) as moods,
+        COUNT(DISTINCT mc.mood) as entry_count
+    FROM mood_counts mc
+    GROUP BY mc.entry_date
+    ORDER BY mc.entry_date DESC;
 END;
 $$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION get_mood_trends TO authenticated;
+GRANT EXECUTE ON FUNCTION get_mood_trends TO service_role;
 
 -- Recommended Activities Based on Mood Tags
 CREATE OR REPLACE FUNCTION get_recommended_activities(

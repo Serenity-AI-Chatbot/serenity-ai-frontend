@@ -59,6 +59,27 @@ const datePatterns = {
   specificDate: /(?:on\s+)?([A-Za-z]+day,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4})/i
 };
 
+// Add interface for mood analysis
+interface MoodAnalysis {
+  dominant_mood: string;
+  mood_progression: Array<{
+    date: string;
+    moods: Record<string, number>;
+  }>;
+  recurring_patterns: Array<{
+    trigger: string;
+    associated_moods: string[];
+  }>;
+}
+
+// Add interface for activity recommendation
+interface ActivityRecommendation {
+  activity: Activity;
+  confidence_score: number;
+  reasoning: string;
+  past_success_rate?: number;
+}
+
 export async function POST(req: Request) {
   if (!process.env.GEMINI_API_KEY) {
     return new Response("Missing API key", { status: 500 })
@@ -72,17 +93,17 @@ export async function POST(req: Request) {
 
   try {
     // Get journal entries based on user message
-    const journalEntries = await fetchRelevantJournalEntries(userId, latestUserMessage)
+    const { entries, moodAnalysis, recommendations } = await fetchRelevantJournalEntries(userId, latestUserMessage)
     
     // Fetch and format activities
     const activities = await fetchActivities()
     
     // Format contexts
-    const journalContext = formatJournalEntries(journalEntries)
+    const journalContext = formatJournalEntries(entries)
     const activitiesContext = formatActivities(activities)
     
     // Prepare and send chat message
-    const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext)
+    const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext, moodAnalysis, recommendations)
     return await streamChatResponse(model, geminiMessages, latestUserMessage)
   } catch (error) {
     return handleError(error)
@@ -92,19 +113,43 @@ export async function POST(req: Request) {
 async function fetchRelevantJournalEntries(userId: string, userMessage: string) {
   const queryEmbedding = await generateEmbedding(userMessage)
   
-  // Check for date range pattern first
-  const dateRangeMatch = userMessage.match(datePatterns.dateRange)
-  if (dateRangeMatch) {
-    return await fetchJournalsByDateRange(userId, dateRangeMatch)
+  try {
+    // Check for date range pattern first
+    const dateRangeMatch = userMessage.match(datePatterns.dateRange)
+    if (dateRangeMatch) {
+      const result = await fetchJournalsByDateRange(userId, dateRangeMatch)
+      return {
+        entries: Array.isArray(result) ? result : [],
+        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+        recommendations: []  // You can implement this based on your needs
+      }
+    }
+    
+    const monthYearMatch = userMessage.match(datePatterns.monthYear)
+    if (monthYearMatch) {
+      const result = await fetchJournalsByMonthYear(userId, monthYearMatch)
+      return {
+        entries: Array.isArray(result) ? result : [],
+        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+        recommendations: []
+      }
+    }
+    
+    const dateMatch = userMessage.match(datePatterns.specificDate)
+    const result = await fetchJournalsByDateOrSemantic(userId, dateMatch, queryEmbedding)
+    return {
+      entries: Array.isArray(result) ? result : [],
+      moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+      recommendations: []
+    }
+  } catch (error) {
+    console.error("Error fetching journal entries:", error)
+    return {
+      entries: [],
+      moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+      recommendations: []
+    }
   }
-  
-  const monthYearMatch = userMessage.match(datePatterns.monthYear)
-  if (monthYearMatch) {
-    return await fetchJournalsByMonthYear(userId, monthYearMatch)
-  }
-  
-  const dateMatch = userMessage.match(datePatterns.specificDate)
-  return await fetchJournalsByDateOrSemantic(userId, dateMatch, queryEmbedding)
 }
 
 async function fetchJournalsByMonthYear(userId: string, match: RegExpMatchArray) {
@@ -212,22 +257,33 @@ async function fetchActivities() {
   return data
 }
 
-function formatJournalEntries(entries: JournalEntry[]) {
+function formatJournalEntries(entries: JournalEntry[] | null | undefined) {
+  // Check if entries exists and is an array
+  if (!entries || !Array.isArray(entries)) {
+    console.log("No entries found or invalid entries format:", entries);
+    return "No journal entries found.";
+  }
+
+  // Check if array is empty
+  if (entries.length === 0) {
+    return "No journal entries found.";
+  }
+
   const formattedEntries = entries
     .map(entry => `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
-    Title: ${entry.title}
-    Content: ${entry.content}
-    Summary: ${entry.summary}
-    Mood Tags: ${entry.mood_tags.join(", ")}
-    Tags: ${entry.tags.join(", ")}
-    Keywords: ${entry.keywords.join(", ")}`)
-    .join("\n\n")
+    Title: ${entry.title || 'Untitled'}
+    Content: ${entry.content || 'No content'}
+    Summary: ${entry.summary || 'No summary'}
+    Mood Tags: ${(entry.mood_tags || []).join(", ") || 'No mood tags'}
+    Tags: ${(entry.tags || []).join(", ") || 'No tags'}
+    Keywords: ${(entry.keywords || []).join(", ") || 'No keywords'}`)
+    .join("\n\n");
 
   console.log("================================================")
   console.log("formatJournalEntries:", formattedEntries)
   console.log("================================================")
 
-  return formattedEntries
+  return formattedEntries;
 }
 
 function formatActivities(activities: Activity[]) {
@@ -243,15 +299,46 @@ function formatActivities(activities: Activity[]) {
     .join("\n\n")
 }
 
-function prepareChatMessages(messages: any[], journalContext: string, activitiesContext: string) {
+function formatMoodProgression(moodProgression: Array<{ date: string; moods: Record<string, number> }>) {
+  return moodProgression.map(entry => {
+    const date = new Date(entry.date).toLocaleDateString();
+    const moodsList = Object.entries(entry.moods)
+      .map(([mood, count]) => `${mood}(${count})`)
+      .join(', ');
+    return `${date}: ${moodsList}`;
+  }).join('\n');
+}
+
+function prepareChatMessages(messages: any[], journalContext: string, activitiesContext: string, moodAnalysis: MoodAnalysis, recommendations: ActivityRecommendation[]) {
+  const enhancedContext = `
+    Journal Context:
+    ${journalContext}
+    
+    Mood Analysis:
+    - Dominant Mood: ${moodAnalysis.dominant_mood}
+    - Recent Mood Progression:
+    ${formatMoodProgression(moodAnalysis.mood_progression)}
+    
+    Patterns Identified:
+    ${moodAnalysis.recurring_patterns.map(pattern => 
+      `- ${pattern.trigger}: ${pattern.associated_moods.join(', ')}`
+    ).join('\n')}
+    
+    Personalized Activity Recommendations:
+    ${formatRecommendations(recommendations)}
+    
+    Available Activities:
+    ${activitiesContext}
+  `
+
   return [
     { role: "user", parts: [{ text: "Initialize chat" }] },
     { role: "model", parts: [{ text: SYSTEM_PROMPT }] },
     {
       role: "user",
       parts: [{
-        text: `Here are some relevant journal entries for context:\n\n${journalContext}\n\nAnd here are all available activities you can recommend:\n\n${activitiesContext}\n\nPlease keep these in mind when responding to the user.`,
-      }],
+        text: enhancedContext
+      }]
     },
     { role: "model", parts: [{ text: "Understood. I'll keep this context in mind when responding to the user." }] },
     ...messages.map(msg => ({
@@ -298,4 +385,77 @@ function handleError(error: any) {
       headers: { 'Content-Type': 'application/json' }
     }
   )
+}
+
+async function analyzeMoodPatterns(userId: string, timeframe: string): Promise<MoodAnalysis> {
+  try {
+    const { data, error } = await supabase.rpc('get_mood_trends', {
+      p_user_id: userId
+    })
+    
+    if (error) throw error
+    if (!data) {
+      return {
+        dominant_mood: "neutral",
+        mood_progression: [],
+        recurring_patterns: []
+      }
+    }
+    
+    // Format the mood progression data
+    const moodProgression = data.map((entry: any) => ({
+      date: new Date(entry.entry_date).toISOString().split('T')[0],
+      moods: entry.moods || {}
+    }))
+
+    // Calculate dominant mood
+    const allMoods = data.flatMap((entry: any) => Object.entries(entry.moods || {}));
+    const moodCounts = allMoods.reduce((acc: Record<string, number>, [mood, count]: [string, number]) => {
+      acc[mood] = (acc[mood] || 0) + (typeof count === 'number' ? count : 0);
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const dominantMood = Object.entries(moodCounts)
+      .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || "neutral";
+
+    // Format patterns
+    const patterns = data
+      .filter((entry: any) => Object.keys(entry.moods || {}).length > 0)
+      .map((entry: any) => ({
+        trigger: `Entry on ${new Date(entry.entry_date).toLocaleDateString()}`,
+        associated_moods: Object.keys(entry.moods || {})
+      }))
+      .slice(0, 5);
+
+    console.log("================================================")
+    console.log("analyzeMoodPatterns:", {
+      dominant_mood: dominantMood,
+      mood_progression: moodProgression,
+      recurring_patterns: patterns
+    })
+    console.log("================================================")
+
+    return {
+      dominant_mood: dominantMood,
+      mood_progression: moodProgression,
+      recurring_patterns: patterns
+    }
+  } catch (error) {
+    console.error("Error in analyzeMoodPatterns:", error)
+    return {
+      dominant_mood: "neutral",
+      mood_progression: [],
+      recurring_patterns: []
+    }
+  }
+}
+
+function formatRecommendations(recommendations: ActivityRecommendation[]): string {
+  return recommendations.map(recommendation => {
+    const activity = recommendation.activity;
+    const confidence = recommendation.confidence_score.toFixed(2);
+    const reasoning = recommendation.reasoning;
+    const pastSuccessRate = recommendation.past_success_rate ? `(${recommendation.past_success_rate.toFixed(2)}%)` : "";
+    return `${activity.title} - Confidence: ${confidence} - Reasoning: ${reasoning} - Past Success Rate: ${pastSuccessRate}`;
+  }).join("\n");
 }
