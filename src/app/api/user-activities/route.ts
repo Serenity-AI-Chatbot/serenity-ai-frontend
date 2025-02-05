@@ -1,11 +1,10 @@
-import { supabase } from "@/lib/supabase"
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { requireAuth, supabase } from "@/lib/supabase-server"
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
+  await requireAuth()
   
   try {
     const { data, error } = await supabase
@@ -42,23 +41,8 @@ export async function POST(request: Request) {
     const body = await request.json()
     
     // Initialize Supabase client with route handler
-    const supabase = createRouteHandlerClient({ cookies })
-
-    // Get the current session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const { session } = await requireAuth()
     
-    if (!session) {
-      console.log('No session found') // Debug log
-      return NextResponse.json(
-        { error: 'Unauthorized - No session found' },
-        { status: 401 }
-      )
-    }
-
-    console.log('Session found for user:', session.user.id) // Debug log
-
     // Add user_id to the activity object
     const activityWithUser = {
       ...body,

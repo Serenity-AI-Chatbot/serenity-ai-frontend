@@ -1,7 +1,10 @@
-import { supabase } from "@/lib/supabase"
+import {  requireAuth, supabase } from "@/lib/supabase-server"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
+  const { session } = await requireAuth()
+  
+  
   const category = searchParams.get('category')
   
   try {

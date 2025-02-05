@@ -1,13 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { createClient } from "@supabase/supabase-js"
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseAuthClient, requireAuth, supabase } from "@/lib/supabase-server"
 
 // Initialize the Gemini model with proper error handling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
-
-// Initialize Supabase client
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Set the runtime to edge for better performance
 export const runtime = "edge"
@@ -43,24 +38,8 @@ export async function POST(req: Request) {
 
   const { messages } = await req.json()
 
-  // Get the authenticated user's session
-  const cookieStore = cookies()
-  const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore })
-  const { data: { session }, error: sessionError } = await supabaseAuth.auth.getSession()
-
-  if (sessionError || !session) {
-    return new Response(
-      JSON.stringify({
-        error: "Unauthorized",
-      }),
-      {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    )
-  }
+  // Get the authenticated user's session using the shared auth client
+  const { session } = await requireAuth()
 
   const userId = session.user.id
   const model = genAI.getGenerativeModel({ model: "gemini-pro" })
@@ -76,6 +55,10 @@ export async function POST(req: Request) {
     match_count: 5,
     user_id: userId
   })
+
+  console.log("================================================")
+  console.log('match_journals rpc response:', journalEntries);
+  console.log("================================================")
 
   if (error) {
     console.error("Error fetching journal entries:", error)

@@ -1,6 +1,6 @@
-import { supabase } from "@/lib/supabase"
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { requireAuth } from '@/lib/supabase-server'
+import { supabase } from "@/lib/supabase-server"
+import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   try {
@@ -8,19 +8,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const daysBack = parseInt(searchParams.get('daysBack') || '90')
 
-    // Auth check
-    const cookieStore = cookies()
-    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    // Use the centralized auth check
+    const { session } = await requireAuth()
 
-    // Call the new dashboard insights function with user_id and days_back
+    // Call the dashboard insights function with the authenticated user's ID
     const { data, error } = await supabase.rpc('get_dashboard_insights', {
       p_user_id: session.user.id,
       p_days_back: daysBack
@@ -49,17 +40,26 @@ export async function GET(request: Request) {
       }
     }
 
-    return new Response(JSON.stringify(transformedData), {
+    return NextResponse.json(transformedData, {
       headers: {
-        'Content-Type': 'application/json',
         'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120'
       },
     })
   } catch (error) {
     console.error('Dashboard insights error:', error)
-    return new Response(JSON.stringify({ error: 'Failed to fetch dashboard insights' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    
+    // Handle unauthorized errors specifically
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Handle other errors
+    return NextResponse.json(
+      { error: 'Failed to fetch dashboard insights' },
+      { status: 500 }
+    )
   }
 }

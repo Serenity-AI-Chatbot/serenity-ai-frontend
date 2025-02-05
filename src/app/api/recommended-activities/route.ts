@@ -1,6 +1,4 @@
-import { supabase } from "@/lib/supabase"
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { requireAuth, supabase } from "@/lib/supabase-server"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -8,19 +6,8 @@ export async function GET(request: Request) {
 
   try {
     // Create authenticated Supabase client using awaited cookies
-    const cookieStore = cookies()
-    const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore })
+    const { session } = await requireAuth()
     
-    // Get user session
-    const { data: { session } } = await supabaseAuth.auth.getSession()
-    
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
-
     const { data, error } = await supabase.rpc('get_recommended_activities', {
       p_user_id: session.user.id,
       p_current_mood_tags: moodTags

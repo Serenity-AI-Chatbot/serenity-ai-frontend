@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { requireAuth, supabase } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 
 export async function PATCH(
@@ -9,15 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const supabase = createRouteHandlerClient({ cookies });
-
-    // Get the current session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    const { session } = await requireAuth()
 
     const body = await req.json();
     const { status, completed_at, reflection } = body;

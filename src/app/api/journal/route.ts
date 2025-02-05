@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import {  requireAuth, supabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
@@ -49,16 +48,7 @@ async function generateTags(content: string): Promise<string[]> {
 export async function GET() {
   try {
     // Get authenticated user
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const { session } = await requireAuth()
 
     // Fetch journals with all relevant fields
     const { data, error } = await supabase
@@ -104,16 +94,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     // Get authenticated user
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const { session } = await requireAuth()
 
     // Get request body
     const { title, content } = await request.json()

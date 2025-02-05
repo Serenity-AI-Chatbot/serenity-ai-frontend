@@ -1,5 +1,4 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { requireAuth } from "@/lib/supabase-server";
 import { AuthForm } from "@/components/landing/auth-form";
 import { DashboardSidebar } from "@/components/sidebar-implementation";
 
@@ -8,11 +7,7 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { session } = await requireAuth()
 
   if (!session) {
     return (
