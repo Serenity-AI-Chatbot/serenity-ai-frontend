@@ -458,44 +458,39 @@ $$;
 GRANT EXECUTE ON FUNCTION get_journals_by_date TO authenticated;
 GRANT EXECUTE ON FUNCTION get_journals_by_date TO service_role;
 
--- Create a function to get journal statistics by time period
+-- Update get_journal_stats_by_period function
 CREATE OR REPLACE FUNCTION get_journal_stats_by_period(
     p_user_id UUID,
     p_start_date DATE,
     p_end_date DATE
 )
 RETURNS TABLE (
-    period_start DATE,
-    entry_count BIGINT,
-    mood_distribution JSONB,
-    top_keywords TEXT[]
+    id UUID,
+    title TEXT,
+    content TEXT,
+    summary TEXT,
+    mood_tags TEXT[],
+    tags TEXT[],
+    keywords TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
 AS $$
 BEGIN
     RETURN QUERY
-    WITH mood_stats AS (
-        SELECT 
-            DATE_TRUNC('day', created_at)::DATE as entry_date,
-            COUNT(*) as daily_entries,
-            jsonb_object_agg(
-                mood, COUNT(*)
-            ) as daily_moods,
-            array_agg(DISTINCT keyword) as daily_keywords
-        FROM journals,
-        LATERAL unnest(mood_tags) as mood,
-        LATERAL unnest(keywords) as keyword
-        WHERE user_id = p_user_id
-        AND created_at::DATE BETWEEN p_start_date AND p_end_date
-        GROUP BY DATE_TRUNC('day', created_at)::DATE
-    )
     SELECT 
-        ms.entry_date,
-        ms.daily_entries,
-        ms.daily_moods,
-        ms.daily_keywords
-    FROM mood_stats ms
-    ORDER BY ms.entry_date;
+        j.id,
+        j.title,
+        j.content,
+        j.summary,
+        j.mood_tags,
+        j.tags,
+        j.keywords,
+        j.created_at
+    FROM journals j
+    WHERE j.user_id = p_user_id
+    AND j.created_at::DATE BETWEEN p_start_date AND p_end_date
+    ORDER BY j.created_at DESC;
 END;
 $$;
 

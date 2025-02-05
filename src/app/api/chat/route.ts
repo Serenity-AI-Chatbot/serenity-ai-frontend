@@ -43,6 +43,15 @@ interface Activity {
     created_at: string;
     similarity?: number;
   }
+
+// Add interface for journal stats
+interface JournalStats {
+  period_start: Date;
+  entry_count: number;
+  mood_distribution: Record<string, number>;
+  top_keywords: string[];
+}
+
 // Add new date-related regex patterns
 const datePatterns = {
   monthYear: /(?:in|during|for)\s+(?:([A-Za-z]+)\s+)?(\d{4})?/i,
@@ -82,6 +91,12 @@ export async function POST(req: Request) {
 
 async function fetchRelevantJournalEntries(userId: string, userMessage: string) {
   const queryEmbedding = await generateEmbedding(userMessage)
+  
+  // Check for date range pattern first
+  const dateRangeMatch = userMessage.match(datePatterns.dateRange)
+  if (dateRangeMatch) {
+    return await fetchJournalsByDateRange(userId, dateRangeMatch)
+  }
   
   const monthYearMatch = userMessage.match(datePatterns.monthYear)
   if (monthYearMatch) {
@@ -147,6 +162,48 @@ async function fetchJournalsByDateOrSemantic(userId: string, dateMatch: RegExpMa
 
   if (response.error) throw response.error
   return response.data
+}
+
+async function fetchJournalsByDateRange(userId: string, match: RegExpMatchArray) {
+  const startDateStr = match[1].trim()
+  const endDateStr = match[2].trim()
+  
+  try {
+    const startDate = parse(startDateStr, 'MMMM d, yyyy', new Date())
+    const endDate = parse(endDateStr, 'MMMM d, yyyy', new Date())
+
+    console.log("================================================") 
+    console.log("startDateStr:", startDateStr)
+    console.log("endDateStr:", endDateStr)
+    console.log("startDate:", startDate)
+    console.log("endDate:", endDate)
+    console.log("================================================")
+
+    const { data, error } = await supabase.rpc('get_journal_stats_by_period', {
+      p_user_id: userId,
+      p_start_date: format(startDate, 'yyyy-MM-dd'),
+      p_end_date: format(endDate, 'yyyy-MM-dd')
+    });
+
+    console.log("================================================")
+    console.log("get_journal_stats_by_period:", data)
+    console.log("================================================")
+
+    if (error) throw error
+    if (!data) return []
+
+    // Process the entries to ensure all required fields are present
+    return data.map((entry: JournalEntry) => ({
+      ...entry,
+      mood_tags: entry.mood_tags || [],
+      tags: entry.tags || [],
+      keywords: entry.keywords || []
+    }));
+
+  } catch (error) {
+    console.error("Error fetching date range:", error)
+    throw error
+  }
 }
 
 async function fetchActivities() {
