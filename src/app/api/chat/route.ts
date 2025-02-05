@@ -87,6 +87,11 @@ export async function POST(req: Request) {
 
   const { messages } = await req.json()
   const { session } = await requireAuth()
+  
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+
   const userId = session.user.id
   const model = genAI.getGenerativeModel({ model: "gemini-pro" })
   const latestUserMessage = messages[messages.length - 1].content

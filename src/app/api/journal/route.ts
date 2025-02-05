@@ -49,6 +49,10 @@ export async function GET() {
   try {
     // Get authenticated user
     const { session } = await requireAuth()
+    
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 })
+    }
 
     // Fetch journals with all relevant fields
     const { data, error } = await supabase
@@ -140,7 +144,7 @@ export async function POST(request: Request) {
 
     // First prepare the journal data without embedding
     const journalData = {
-      user_id: session.user.id,
+      user_id: session?.user.id,
       title,
       content,
       summary: flaskData.summary,

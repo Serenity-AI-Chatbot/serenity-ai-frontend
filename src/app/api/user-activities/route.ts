@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
-  await requireAuth()
+  const { session } = await requireAuth()
+
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 })
+  } 
   
   try {
     const { data, error } = await supabase
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
     // Add user_id to the activity object
     const activityWithUser = {
       ...body,
-      user_id: session.user.id
+      user_id: session?.user.id
     }
 
     const { data, error } = await supabase

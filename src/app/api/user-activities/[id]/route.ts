@@ -10,6 +10,10 @@ export async function PATCH(
 
     const { session } = await requireAuth()
 
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 })
+    }
+
     const body = await req.json();
     const { status, completed_at, reflection } = body;
 

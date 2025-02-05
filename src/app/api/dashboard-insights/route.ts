@@ -11,6 +11,10 @@ export async function GET(request: Request) {
     // Use the centralized auth check
     const { session } = await requireAuth()
 
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 })
+    }
+
     // Call the dashboard insights function with the authenticated user's ID
     const { data, error } = await supabase.rpc('get_dashboard_insights', {
       p_user_id: session.user.id,

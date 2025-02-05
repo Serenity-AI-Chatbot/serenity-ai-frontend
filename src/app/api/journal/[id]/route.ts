@@ -6,8 +6,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  await requireAuth()
-  
+  const { session } = await requireAuth()
+
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 })
+  }
 
   const { data, error } = await supabase
     .from("journals")

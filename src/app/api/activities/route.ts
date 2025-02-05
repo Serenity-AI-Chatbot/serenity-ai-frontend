@@ -4,6 +4,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const { session } = await requireAuth()
   
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 })
+  }
   
   const category = searchParams.get('category')
   

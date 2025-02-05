@@ -50,6 +50,9 @@ export function DashboardSidebar() {
       }
       
       // Force a page reload to reflect the signed-out state
+      localStorage.clear()
+      router.refresh()
+      
       window.location.href = '/'
     } catch (error) {
       console.error("Error signing out:", error)

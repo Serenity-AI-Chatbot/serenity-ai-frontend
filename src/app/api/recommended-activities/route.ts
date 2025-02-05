@@ -7,6 +7,10 @@ export async function GET(request: Request) {
   try {
     // Create authenticated Supabase client using awaited cookies
     const { session } = await requireAuth()
+
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 })
+    }
     
     const { data, error } = await supabase.rpc('get_recommended_activities', {
       p_user_id: session.user.id,

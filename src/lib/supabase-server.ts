@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { log } from "console"
 
 // Admin client for database operations (no auth needed)
 export const supabase = createClient(
@@ -19,35 +20,22 @@ export function getSupabaseAuthClient() {
   return authClient
 }
 
-// For protected API routes - with session caching
-let cachedSession: any = null
-const SESSION_CACHE_TIME = 60 * 1000 * 60 // 60 minute cache
+// For protected API routes - without session caching
 
 export async function requireAuth() {
-  const now = Date.now()
-  
-  // Return cached session if valid
-  if (cachedSession && cachedSession.timestamp + SESSION_CACHE_TIME > now) {
-    console.log("================")
-    console.log('Returning cached session')
-    console.log(cachedSession.data.session.user.id)
-    console.log("================")
-    return cachedSession.data
-  }
-
   const supabase = getSupabaseAuthClient()
-  const { data: { session }, error } = await supabase.auth.getSession()
-  
-  // Instead of throwing an error, return null session
-  if (error || !session) {
-    return { supabase, session: null }
-  }
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
 
-  // Cache the successful response
-  cachedSession = {
-    timestamp: now,
-    data: { supabase, session }
+    // Check for errors or missing session
+    if (error || !session) {
+      console.log('Error fetching session:', error)
+      return { session: null, error: 'Unauthorized' }
+    }
+
+    return { session, error: null }
+  } catch (err) {
+    console.error('Unexpected error in requireAuth:', err)
+    return { session: null, error: 'Unauthorized' }
   }
-  
-  return { supabase, session }
 }
