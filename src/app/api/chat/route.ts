@@ -93,7 +93,7 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
   const latestUserMessage = messages[messages.length - 1].content
 
   try {

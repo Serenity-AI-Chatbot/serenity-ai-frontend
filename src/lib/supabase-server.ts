@@ -14,8 +14,7 @@ let authClient: ReturnType<typeof createRouteHandlerClient> | null = null
 // Get or create auth client
 export function getSupabaseAuthClient() {
   if (!authClient) {
-    const cookieStore = cookies()
-    authClient = createRouteHandlerClient({ cookies: () => cookieStore })
+    authClient = createRouteHandlerClient({ cookies })
   }
   return authClient
 }

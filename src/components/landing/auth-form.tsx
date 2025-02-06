@@ -45,6 +45,9 @@ export function AuthForm() {
             description: "Welcome to your new account!",
           })
         }
+        
+        router.push('/dashboard')
+
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
@@ -59,7 +62,7 @@ export function AuthForm() {
         })
       }
 
-      router.refresh()
+      router.push('/dashboard')
     } catch (error: any) {
       toast({
         title: "Error",
