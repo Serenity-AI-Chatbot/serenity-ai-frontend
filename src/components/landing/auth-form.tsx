@@ -47,6 +47,7 @@ export function AuthForm() {
         }
         
         router.push('/dashboard')
+        router.refresh()
 
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -63,6 +64,8 @@ export function AuthForm() {
       }
 
       router.push('/dashboard')
+      router.refresh()
+      
     } catch (error: any) {
       toast({
         title: "Error",
