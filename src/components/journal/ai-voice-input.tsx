@@ -1,10 +1,7 @@
-"use client"
-
 import { Mic } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 
-// Add TypeScript declarations for the SpeechRecognition API
 declare global {
   interface Window {
     SpeechRecognition: any
@@ -25,7 +22,6 @@ const isBrowserSupported = () => {
   return typeof window !== 'undefined' && (
     window.SpeechRecognition ||
     window.webkitSpeechRecognition ||
-    // Add Firefox support when available
     (window as any).mozSpeechRecognition
   )
 }
@@ -43,6 +39,7 @@ export function AIVoiceInput({
   const [isClient, setIsClient] = useState(false)
   const [isDemo, setIsDemo] = useState(demoMode)
   const [recognition, setRecognition] = useState<any>(null)
+  const [transcript, setTranscript] = useState("")
 
   // Initialize SpeechRecognition
   useEffect(() => {
@@ -50,28 +47,33 @@ export function AIVoiceInput({
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognitionInstance = new SpeechRecognition();
-        recognitionInstance.continuous = true;
+        recognitionInstance.continuous = false; // Changed to false to prevent continuous listening
         recognitionInstance.interimResults = true;
-        recognitionInstance.lang = 'en-US';
+        recognitionInstance.lang = 'en-IN';
         
-        // Add event listeners
         recognitionInstance.onstart = () => {
           setSubmitted(true);
+          setTranscript(""); // Clear transcript when starting
           onStart?.();
         };
 
         recognitionInstance.onend = () => {
           setSubmitted(false);
+          if (transcript) {
+            onStop?.(transcript);
+          }
         };
 
         recognitionInstance.onresult = (event: any) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0])
-            .map((result: any) => result.transcript)
-            .join('');
+          const currentTranscript = Array.from(event.results)
+            .map((result: any) => result[0].transcript)
+            .join(' ');
+          
+          setTranscript(currentTranscript);
           
           if (event.results[0].isFinal) {
-            onStop?.(transcript);
+            onStop?.(currentTranscript);
+            recognitionInstance.stop();
           }
         };
 
@@ -83,6 +85,13 @@ export function AIVoiceInput({
         setRecognition(recognitionInstance);
       }
     }
+
+    // Cleanup function to stop recognition when component unmounts
+    return () => {
+      if (recognition) {
+        recognition.stop();
+      }
+    };
   }, [onStart, onStop]);
 
   useEffect(() => {
@@ -111,33 +120,15 @@ export function AIVoiceInput({
     let intervalId: NodeJS.Timeout
 
     if (submitted) {
-      onStart?.()
       intervalId = setInterval(() => {
         setTime((t) => t + 1)
       }, 1000)
+    } else {
+      setTime(0) // Reset timer when stopped
     }
 
     return () => clearInterval(intervalId)
-  }, [submitted, onStart])
-
-  useEffect(() => {
-    if (!isDemo) return
-
-    let timeoutId: NodeJS.Timeout
-    const runAnimation = () => {
-      setSubmitted(true)
-      timeoutId = setTimeout(() => {
-        setSubmitted(false)
-        timeoutId = setTimeout(runAnimation, 1000)
-      }, demoInterval)
-    }
-
-    const initialTimeout = setTimeout(runAnimation, 100)
-    return () => {
-      clearTimeout(timeoutId)
-      clearTimeout(initialTimeout)
-    }
-  }, [isDemo, demoInterval])
+  }, [submitted])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -203,13 +194,14 @@ export function AIVoiceInput({
           ))}
         </div>
 
-        <p className="h-4 text-xs text-black/70 dark:text-white/70">{submitted ? "Listening..." : "Click to speak"}</p>
+        <p className="h-4 text-xs text-black/70 dark:text-white/70">
+          {submitted ? "Listening..." : "Click to speak"}
+        </p>
 
         <p className="mt-4 text-sm text-center text-black/70 dark:text-white/70 max-w-md">
-          {recognition?.transcript || "Speak now..."}
+          {transcript || "Speak now..."}
         </p>
       </div>
     </div>
   )
 }
-

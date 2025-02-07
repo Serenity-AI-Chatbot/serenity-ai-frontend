@@ -128,11 +128,14 @@ export function JournalEntry() {
                   <DialogDescription>Speak to add text to your journal entry</DialogDescription>
                 </DialogHeader>
                 <AIVoiceInput onStart={() => setVoiceText("")} onStop={handleVoiceInput} />
-                <p className="mt-4 text-center text-sm text-gray-500">{voiceText || "Speak now..."}</p>
               </DialogContent>
             </Dialog>
           </div>
         </div>
+
+        <span className="text-red-500 text-sm mt-2">
+          ⚠️ Voice input is supported only in the latest versions of Safari and Chrome browsers not supported in Brave.
+        </span>
 
         <button
           type="submit"
