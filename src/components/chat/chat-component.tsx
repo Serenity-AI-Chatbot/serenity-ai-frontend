@@ -44,6 +44,7 @@ export default function ChatComponent() {
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const speechSynthesis = typeof window !== 'undefined' ? window.speechSynthesis : null
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isPlayingRef = useRef(false)
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -122,7 +123,7 @@ export default function ChatComponent() {
       setMessages((prev: any) => {
         const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
         localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
-        // Speak the assistant's message if in voice mode
+        // Only speak if in voice mode
         if (isVoiceMode) {
           speakText(assistantMessage)
         }
@@ -162,30 +163,57 @@ export default function ChatComponent() {
 
 
   const speakText = (text: string) => {
-    if (speechSynthesis) {
-      // Cancel any ongoing speech
-      speechSynthesis.cancel()
-      
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 1.0
-      utterance.pitch = 1.0
-      utterance.volume = 1.0
-      
-      // Get available voices and set a natural sounding English voice if available
+    if (!speechSynthesis || isPlayingRef.current) return
+
+    // Cancel any ongoing speech
+    speechSynthesis.cancel()
+    
+    const utterance = new SpeechSynthesisUtterance(text)
+    
+    // Optimize voice settings for more natural speech
+    utterance.rate = 0.9  // Slightly slower for better clarity
+    utterance.pitch = 1.1 // Slightly higher pitch for more natural sound
+    utterance.volume = 1.0
+    
+    // Wait for voices to be loaded
+    const loadVoices = () => {
       const voices = speechSynthesis.getVoices()
-      const englishVoice = voices.find(
-        (voice) => voice.lang.startsWith('en') && voice.name.includes('Alex')
-      ) || voices.find(
-        (voice) => voice.lang.startsWith('en')
-      )
+      // Try to find a high-quality English voice
+      const preferredVoices = [
+        'Samantha',
+        'Karen',
+        'Daniel',
+        'Google UK English Female',
+        'Microsoft Libby Online (Natural)',
+        'Microsoft Jenny Online (Natural)'
+      ]
       
-      if (englishVoice) {
-        utterance.voice = englishVoice
+      const voice = voices.find(v => 
+        preferredVoices.some(pv => v.name.includes(pv)) && v.lang.startsWith('en')
+      ) || voices.find(v => v.lang.startsWith('en'))
+      
+      if (voice) {
+        utterance.voice = voice
       }
-      
-      speechSynthesis.speak(utterance)
-      setIsVoiceMode(false)
     }
+
+    loadVoices()
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = loadVoices
+    }
+
+    isPlayingRef.current = true
+    
+    utterance.onend = () => {
+      isPlayingRef.current = false
+    }
+
+    utterance.onerror = () => {
+      isPlayingRef.current = false
+    }
+
+    speechSynthesis.speak(utterance)
+    setIsVoiceMode(false)
   }
 
 
