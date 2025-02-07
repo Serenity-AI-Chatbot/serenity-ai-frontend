@@ -21,6 +21,15 @@ interface AIVoiceInputProps {
   className?: string
 }
 
+const isBrowserSupported = () => {
+  return typeof window !== 'undefined' && (
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition ||
+    // Add Firefox support when available
+    (window as any).mozSpeechRecognition
+  )
+}
+
 export function AIVoiceInput({
   onStart,
   onStop,
@@ -33,18 +42,70 @@ export function AIVoiceInput({
   const [time, setTime] = useState(0)
   const [isClient, setIsClient] = useState(false)
   const [isDemo, setIsDemo] = useState(demoMode)
-  const [text, setText] = useState("")
+  const [recognition, setRecognition] = useState<any>(null)
+
+  // Initialize SpeechRecognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = true;
+        recognitionInstance.interimResults = true;
+        recognitionInstance.lang = 'en-US';
+        
+        // Add event listeners
+        recognitionInstance.onstart = () => {
+          setSubmitted(true);
+          onStart?.();
+        };
+
+        recognitionInstance.onend = () => {
+          setSubmitted(false);
+        };
+
+        recognitionInstance.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0])
+            .map((result: any) => result.transcript)
+            .join('');
+          
+          if (event.results[0].isFinal) {
+            onStop?.(transcript);
+          }
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setSubmitted(false);
+        };
+
+        setRecognition(recognitionInstance);
+      }
+    }
+  }, [onStart, onStop]);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
-  const handleStop = useCallback(() => {
-    onStop?.(text)
-    setTime(0)
-    setText("")
-    setSubmitted(false)
-  }, [onStop, text])
+  const handleClick = useCallback(() => {
+    if (isDemo) {
+      setIsDemo(false);
+      setSubmitted(false);
+    } else {
+      if (!submitted) {
+        try {
+          recognition?.start();
+        } catch (error) {
+          console.error('Failed to start recognition:', error);
+        }
+      } else {
+        recognition?.stop();
+        setSubmitted(false);
+      }
+    }
+  }, [isDemo, submitted, recognition]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout
@@ -84,47 +145,13 @@ export function AIVoiceInput({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  const handleClick = useCallback(() => {
-    if (isDemo) {
-      setIsDemo(false)
-      setSubmitted(false)
-    } else {
-      setSubmitted((prev) => !prev)
-    }
-  }, [isDemo])
-
-  useEffect(() => {
-    let recognition: any
-
-    if (submitted && !isDemo) {
-      // Start speech recognition
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognition = new SpeechRecognition()
-        recognition.continuous = true
-        recognition.interimResults = true
-        recognition.onresult = (event: any) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0].transcript)
-            .join(" ")
-          setText(transcript)
-        }
-        recognition.start()
-      } else {
-        console.error("Speech recognition not supported")
-      }
-    } else if (!submitted && recognition) {
-      // Stop speech recognition
-      recognition.stop()
-      handleStop()
-    }
-
-    return () => {
-      if (recognition) {
-        recognition.stop()
-      }
-    }
-  }, [submitted, isDemo, handleStop])
+  if (!isClient || !isBrowserSupported()) {
+    return (
+      <div className="text-center text-red-500">
+        Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.
+      </div>
+    )
+  }
 
   return (
     <div className={cn("w-full py-4", className)}>
@@ -177,6 +204,10 @@ export function AIVoiceInput({
         </div>
 
         <p className="h-4 text-xs text-black/70 dark:text-white/70">{submitted ? "Listening..." : "Click to speak"}</p>
+
+        <p className="mt-4 text-sm text-center text-black/70 dark:text-white/70 max-w-md">
+          {recognition?.transcript || "Speak now..."}
+        </p>
       </div>
     </div>
   )
