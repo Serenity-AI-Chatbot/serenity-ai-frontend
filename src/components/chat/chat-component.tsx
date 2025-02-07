@@ -41,6 +41,8 @@ export default function ChatComponent() {
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceInputOpen, setIsVoiceInputOpen] = useState(false);
   const [voiceText, setVoiceText] = useState("");
+  const [isVoiceMode, setIsVoiceMode] = useState(false)
+  const speechSynthesis = typeof window !== 'undefined' ? window.speechSynthesis : null
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,17 +63,17 @@ export default function ChatComponent() {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+    e.preventDefault()
+    if (!input.trim()) return
 
-    const userMessage: Message = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content: input }
     setMessages((prev) => {
-      const updatedMessages = [...prev, userMessage];
-      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
-      return updatedMessages;
-    });
-    setInput("");
-    setIsTyping(true);
+      const updatedMessages = [...prev, userMessage]
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+      return updatedMessages
+    })
+    setInput("")
+    setIsTyping(true)
 
     try {
       const response = await fetch("/api/chat", {
@@ -80,71 +82,67 @@ export default function ChatComponent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ messages: [...messages, userMessage] }),
-      });
+      })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const reader = response.body?.getReader();
+      const reader = response.body?.getReader()
       if (!reader) {
-        throw new Error("No reader available");
+        throw new Error("No reader available")
       }
 
-      let assistantMessage = "";
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      let assistantMessage = ""
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
 
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = new TextDecoder().decode(value);
-        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = new TextDecoder().decode(value)
+        const lines = chunk.split("\n").filter((line) => line.trim() !== "")
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             try {
-              const jsonData = JSON.parse(line.slice(5));
+              const jsonData = JSON.parse(line.slice(5))
               if (jsonData.text) {
-                assistantMessage += jsonData.text;
+                assistantMessage += jsonData.text
                 setMessages((prev: any) => {
-                  const updatedMessages = [
-                    ...prev.slice(0, -1),
-                    { role: "assistant", content: assistantMessage },
-                  ];
-                  return updatedMessages;
-                });
+                  const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
+                  return updatedMessages
+                })
               }
             } catch (error) {
-              console.error("Error parsing JSON:", error);
+              console.error("Error parsing JSON:", error)
             }
           }
         }
       }
 
       setMessages((prev: any) => {
-        const updatedMessages = [
-          ...prev.slice(0, -1),
-          { role: "assistant", content: assistantMessage },
-        ];
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
-        return updatedMessages;
-      });
+        const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+        // Speak the assistant's message if in voice mode
+        if (isVoiceMode) {
+          speakText(assistantMessage)
+        }
+        return updatedMessages
+      })
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error:", error)
       setMessages((prev: any) => {
         const updatedMessages = [
           ...prev,
-          {
-            role: "assistant",
-            content: "Sorry, there was an error processing your request.",
-          },
-        ];
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
-        return updatedMessages;
-      });
+          { role: "assistant", content: "Sorry, there was an error processing your request." },
+        ]
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+        return updatedMessages
+      })
     } finally {
-      setIsTyping(false);
+      setIsTyping(false)
     }
-  };
+  }
+
 
   const handleSuggestedPrompt = (prompt: string) => {
     setInput(prompt);
@@ -156,10 +154,40 @@ export default function ChatComponent() {
   };
 
   const handleVoiceInput = (text: string) => {
-    setVoiceText(text);
-    setInput((prevInput) => prevInput + (prevInput ? " " : "") + text);
-    setIsVoiceInputOpen(false);
-  };
+    setVoiceText(text)
+    setInput((prevInput) => prevInput + (prevInput ? " " : "") + text)
+    setIsVoiceInputOpen(false)
+    setIsVoiceMode(true) // Enable voice mode when using voice input
+  }
+
+
+  const speakText = (text: string) => {
+    if (speechSynthesis) {
+      // Cancel any ongoing speech
+      speechSynthesis.cancel()
+      
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 1.0
+      utterance.pitch = 1.0
+      utterance.volume = 1.0
+      
+      // Get available voices and set a natural sounding English voice if available
+      const voices = speechSynthesis.getVoices()
+      const englishVoice = voices.find(
+        (voice) => voice.lang.startsWith('en') && voice.name.includes('Alex')
+      ) || voices.find(
+        (voice) => voice.lang.startsWith('en')
+      )
+      
+      if (englishVoice) {
+        utterance.voice = englishVoice
+      }
+      
+      speechSynthesis.speak(utterance)
+      setIsVoiceMode(false)
+    }
+  }
+
 
   return (
     <Card className="w-full max-w-3xl mx-auto bg-white dark:bg-black shadow-xl rounded-xl overflow-hidden">
