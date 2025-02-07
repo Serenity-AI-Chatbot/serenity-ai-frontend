@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
 
 const SUGGESTED_PROMPTS = [
@@ -41,10 +42,12 @@ export default function ChatComponent() {
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceInputOpen, setIsVoiceInputOpen] = useState(false);
   const [voiceText, setVoiceText] = useState("");
-  const [isVoiceMode, setIsVoiceMode] = useState(false)
-  const speechSynthesis = typeof window !== 'undefined' ? window.speechSynthesis : null
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isVoiceResponseEnabled, setIsVoiceResponseEnabled] = useState(false);
+  const speechSynthesis =
+    typeof window !== "undefined" ? window.speechSynthesis : null;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const isPlayingRef = useRef(false)
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -64,17 +67,17 @@ export default function ChatComponent() {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!input.trim()) return
+    e.preventDefault();
+    if (!input.trim()) return;
 
-    const userMessage: Message = { role: "user", content: input }
+    const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => {
-      const updatedMessages = [...prev, userMessage]
-      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
-      return updatedMessages
-    })
-    setInput("")
-    setIsTyping(true)
+      const updatedMessages = [...prev, userMessage];
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
+    setInput("");
+    setIsTyping(true);
 
     try {
       const response = await fetch("/api/chat", {
@@ -83,67 +86,75 @@ export default function ChatComponent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ messages: [...messages, userMessage] }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const reader = response.body?.getReader()
+      const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error("No reader available")
+        throw new Error("No reader available");
       }
 
-      let assistantMessage = ""
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+      let assistantMessage = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = new TextDecoder().decode(value)
-        const lines = chunk.split("\n").filter((line) => line.trim() !== "")
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split("\n").filter((line) => line.trim() !== "");
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             try {
-              const jsonData = JSON.parse(line.slice(5))
+              const jsonData = JSON.parse(line.slice(5));
               if (jsonData.text) {
-                assistantMessage += jsonData.text
+                assistantMessage += jsonData.text;
                 setMessages((prev: any) => {
-                  const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
-                  return updatedMessages
-                })
+                  const updatedMessages = [
+                    ...prev.slice(0, -1),
+                    { role: "assistant", content: assistantMessage },
+                  ];
+                  return updatedMessages;
+                });
               }
             } catch (error) {
-              console.error("Error parsing JSON:", error)
+              console.error("Error parsing JSON:", error);
             }
           }
         }
       }
 
       setMessages((prev: any) => {
-        const updatedMessages = [...prev.slice(0, -1), { role: "assistant", content: assistantMessage }]
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
+        const updatedMessages = [
+          ...prev.slice(0, -1),
+          { role: "assistant", content: assistantMessage },
+        ];
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
         // Only speak if in voice mode
         if (isVoiceMode) {
-          speakText(assistantMessage)
+          speakText(assistantMessage);
         }
-        return updatedMessages
-      })
+        return updatedMessages;
+      });
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error:", error);
       setMessages((prev: any) => {
         const updatedMessages = [
           ...prev,
-          { role: "assistant", content: "Sorry, there was an error processing your request." },
-        ]
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages))
-        return updatedMessages
-      })
+          {
+            role: "assistant",
+            content: "Sorry, there was an error processing your request.",
+          },
+        ];
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+        return updatedMessages;
+      });
     } finally {
-      setIsTyping(false)
+      setIsTyping(false);
     }
-  }
-
+  };
 
   const handleSuggestedPrompt = (prompt: string) => {
     setInput(prompt);
@@ -155,73 +166,75 @@ export default function ChatComponent() {
   };
 
   const handleVoiceInput = (text: string) => {
-    setVoiceText(text)
-    setInput((prevInput) => prevInput + (prevInput ? " " : "") + text)
-    setIsVoiceInputOpen(false)
-    setIsVoiceMode(true) // Enable voice mode when using voice input
-  }
-
+    setVoiceText(text);
+    setInput((prevInput) => prevInput + (prevInput ? " " : "") + text);
+    setIsVoiceInputOpen(false);
+    setIsVoiceMode(true); // Enable voice mode when using voice input
+  };
 
   const speakText = (text: string) => {
-    if (!speechSynthesis || isPlayingRef.current) return
+    if (!speechSynthesis || isPlayingRef.current || !isVoiceResponseEnabled)
+      return;
 
     // Cancel any ongoing speech
-    speechSynthesis.cancel()
-    
-    const utterance = new SpeechSynthesisUtterance(text)
-    
+    speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
     // Optimize voice settings for more natural speech
-    utterance.rate = 0.9  // Slightly slower for better clarity
-    utterance.pitch = 1.1 // Slightly higher pitch for more natural sound
-    utterance.volume = 1.0
-    
+    utterance.rate = 0.9; // Slightly slower for better clarity
+    utterance.pitch = 1.1; // Slightly higher pitch for more natural sound
+    utterance.volume = 1.0;
+
     // Wait for voices to be loaded
     const loadVoices = () => {
-      const voices = speechSynthesis.getVoices()
+      const voices = speechSynthesis.getVoices();
       // Try to find a high-quality English voice
       const preferredVoices = [
-        'Samantha',
-        'Karen',
-        'Daniel',
-        'Google UK English Female',
-        'Microsoft Libby Online (Natural)',
-        'Microsoft Jenny Online (Natural)'
-      ]
-      
-      const voice = voices.find(v => 
-        preferredVoices.some(pv => v.name.includes(pv)) && v.lang.startsWith('en')
-      ) || voices.find(v => v.lang.startsWith('en'))
-      
+        "Samantha",
+        "Karen",
+        "Daniel",
+        "Google UK English Female",
+        "Microsoft Libby Online (Natural)",
+        "Microsoft Jenny Online (Natural)",
+      ];
+
+      const voice =
+        voices.find(
+          (v) =>
+            preferredVoices.some((pv) => v.name.includes(pv)) &&
+            v.lang.startsWith("en")
+        ) || voices.find((v) => v.lang.startsWith("en"));
+
       if (voice) {
-        utterance.voice = voice
+        utterance.voice = voice;
       }
-    }
+    };
 
-    loadVoices()
+    loadVoices();
     if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = loadVoices
+      speechSynthesis.onvoiceschanged = loadVoices;
     }
 
-    isPlayingRef.current = true
-    
+    isPlayingRef.current = true;
+
     utterance.onend = () => {
-      isPlayingRef.current = false
-    }
+      isPlayingRef.current = false;
+    };
 
     utterance.onerror = () => {
-      isPlayingRef.current = false
-    }
+      isPlayingRef.current = false;
+    };
 
-    speechSynthesis.speak(utterance)
-    setIsVoiceMode(false)
-  }
-
+    speechSynthesis.speak(utterance);
+    setIsVoiceMode(false);
+  };
 
   return (
     <Card className="w-full max-w-3xl mx-auto bg-white dark:bg-black shadow-xl rounded-xl overflow-hidden">
       <CardHeader className="bg-emerald-500 text-white p-6">
         <CardTitle className="text-2xl font-bold">
-          Chat with MindfulAI
+          Chat with Serenity-AI
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
@@ -331,10 +344,26 @@ export default function ChatComponent() {
         </form>
       </CardFooter>
       <div className="px-4 pb-4">
-      <span className="text-red-500 text-sm mt-2">
-        ⚠️ Voice input is supported only in the latest versions of Safari and
-        Chrome browsers not supported in Brave.
-      </span>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="voice-response"
+            checked={isVoiceResponseEnabled}
+            onCheckedChange={(checked) =>
+              setIsVoiceResponseEnabled(checked as boolean)
+            }
+            className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+          />
+          <label
+            htmlFor="voice-response"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
+          >
+           🔈 Enable AI voice responses(Experimental)
+          </label>
+        </div>
+        <span className="text-red-500 text-sm mt-2">
+          ⚠️ Voice input is supported only in the latest versions of Safari and
+          Chrome browsers not supported in Brave.
+        </span>
         <Button
           variant="outline"
           onClick={handleClearChat}
