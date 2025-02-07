@@ -12,6 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Mic } from "lucide-react";
 import {
@@ -23,6 +30,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
+import { useToast } from "@/hooks/use-toast";
+import { ElevenLabsClient } from "elevenlabs";
 
 const SUGGESTED_PROMPTS = [
   "I'm feeling anxious about work. Any tips?",
@@ -36,6 +45,10 @@ interface Message {
   content: string;
 }
 
+type VoiceProvider = "elevenlabs" | "webspeech";
+
+const ELEVEN_LABS_API_KEY = process.env.NEXT_PUBLIC_ELEVEN_LABS_API_KEY;
+
 export default function ChatComponent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -44,22 +57,45 @@ export default function ChatComponent() {
   const [voiceText, setVoiceText] = useState("");
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isVoiceResponseEnabled, setIsVoiceResponseEnabled] = useState(false);
+  const [voiceProvider, setVoiceProvider] =
+    useState<VoiceProvider>("webspeech");
   const speechSynthesis =
     typeof window !== "undefined" ? window.speechSynthesis : null;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [scrollAreaRef]); // Updated dependency
+  }, [scrollAreaRef]);
 
   useEffect(() => {
     const savedMessages = localStorage.getItem("chatMessages");
     if (savedMessages) {
       setMessages(JSON.parse(savedMessages));
     }
+  }, []);
+
+  const stopCurrentAudio = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      URL.revokeObjectURL(currentAudioRef.current.src);
+      currentAudioRef.current = null;
+    }
+    if (speechSynthesis) {
+      speechSynthesis.cancel();
+    }
+    isPlayingRef.current = false;
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCurrentAudio();
+    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,18 +162,21 @@ export default function ChatComponent() {
         }
       }
 
+      // Final message update
       setMessages((prev: any) => {
         const updatedMessages = [
           ...prev.slice(0, -1),
           { role: "assistant", content: assistantMessage },
         ];
         localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
-        // Only speak if in voice mode
-        if (isVoiceMode) {
-          speakText(assistantMessage);
-        }
         return updatedMessages;
       });
+
+      // Only speak after the entire message is received and streaming is complete
+      if (isVoiceMode && isVoiceResponseEnabled) {
+        await speakText(assistantMessage);
+      }
+
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev: any) => {
@@ -172,24 +211,61 @@ export default function ChatComponent() {
     setIsVoiceMode(true); // Enable voice mode when using voice input
   };
 
-  const speakText = (text: string) => {
-    if (!speechSynthesis || isPlayingRef.current || !isVoiceResponseEnabled)
-      return;
+  const speakTextElevenLabs = async (text: string) => {
+    if (!isVoiceResponseEnabled) return;
 
-    // Cancel any ongoing speech
-    speechSynthesis.cancel();
+    // Stop any currently playing audio
+    stopCurrentAudio();
+
+    try {
+      const client = new ElevenLabsClient({
+        apiKey: ELEVEN_LABS_API_KEY,
+      });
+
+      const audio = await client.generate({
+        voice: "Rachel",
+        model_id: "eleven_turbo_v2_5",
+        text,
+      });
+
+      const chunks = [];
+      for await (const chunk of audio) {
+        chunks.push(chunk);
+      }
+
+      const blob = new Blob(chunks, { type: "audio/mpeg" });
+      const audioUrl = URL.createObjectURL(blob);
+      const audioElement = new Audio(audioUrl);
+
+      currentAudioRef.current = audioElement;
+
+      audioElement.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+
+      await audioElement.play();
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      toast({
+        title: "Speech Generation Error",
+        description:
+          "Failed to generate voice response. Please check your API key.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const speakTextWebSpeech = (text: string) => {
+    if (!speechSynthesis || isPlayingRef.current) return;
+    stopCurrentAudio();
 
     const utterance = new SpeechSynthesisUtterance(text);
-
-    // Optimize voice settings for more natural speech
-    utterance.rate = 0.9; // Slightly slower for better clarity
-    utterance.pitch = 1.1; // Slightly higher pitch for more natural sound
+    utterance.rate = 0.9;
+    utterance.pitch = 1.1;
     utterance.volume = 1.0;
-
-    // Wait for voices to be loaded
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices();
-      // Try to find a high-quality English voice
       const preferredVoices = [
         "Samantha",
         "Karen",
@@ -198,36 +274,38 @@ export default function ChatComponent() {
         "Microsoft Libby Online (Natural)",
         "Microsoft Jenny Online (Natural)",
       ];
-
       const voice =
         voices.find(
           (v) =>
             preferredVoices.some((pv) => v.name.includes(pv)) &&
             v.lang.startsWith("en")
         ) || voices.find((v) => v.lang.startsWith("en"));
-
       if (voice) {
         utterance.voice = voice;
       }
     };
-
     loadVoices();
     if (speechSynthesis.onvoiceschanged !== undefined) {
       speechSynthesis.onvoiceschanged = loadVoices;
     }
-
     isPlayingRef.current = true;
-
     utterance.onend = () => {
       isPlayingRef.current = false;
     };
-
     utterance.onerror = () => {
       isPlayingRef.current = false;
     };
-
     speechSynthesis.speak(utterance);
-    setIsVoiceMode(false);
+  };
+  
+  const speakText = (text: string) => {
+    if (!isVoiceResponseEnabled) return;
+
+    if (voiceProvider === "elevenlabs") {
+      speakTextElevenLabs(text);
+    } else {
+      speakTextWebSpeech(text);
+    }
   };
 
   return (
@@ -343,22 +421,38 @@ export default function ChatComponent() {
           </Button>
         </form>
       </CardFooter>
-      <div className="px-4 pb-4">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="voice-response"
-            checked={isVoiceResponseEnabled}
-            onCheckedChange={(checked) =>
-              setIsVoiceResponseEnabled(checked as boolean)
-            }
-            className="border-emerald-500 data-[state=checked]:bg-emerald-500"
-          />
-          <label
-            htmlFor="voice-response"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
-          >
-           🔈 Enable AI voice responses(Experimental)
-          </label>
+      <div className="px-4 pb-4 space-y-4">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="voice-response"
+              checked={isVoiceResponseEnabled}
+              onCheckedChange={(checked) =>
+                setIsVoiceResponseEnabled(checked as boolean)
+              }
+              className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+            />
+            <label
+              htmlFor="voice-response"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
+            >
+              🔈 Enable AI voice responses
+            </label>
+          </div>
+          {isVoiceResponseEnabled && (
+            <Select
+              value={voiceProvider}
+              onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select voice provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
+                <SelectItem value="elevenlabs">ElevenLabs (Limited Credit 🥲)</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <span className="text-red-500 text-sm mt-2">
           ⚠️ Voice input is supported only in the latest versions of Safari and
