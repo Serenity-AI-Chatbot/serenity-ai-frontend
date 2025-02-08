@@ -63,9 +63,6 @@ const getYouTubeVideoId = (url: string) => {
 };
 
 export function JournalDetail({ journal }: JournalDetailProps) {
-  console.log("================================================")
-  console.log("process.env.NEXT_PUBLIC_API_URL", process.env.NEXT_PUBLIC_API_URL)
-  console.log("================================================")
   const router = useRouter();
   const suggestions = getJournalSuggestions(journal);
   console.log(journal);
@@ -147,7 +144,7 @@ export function JournalDetail({ journal }: JournalDetailProps) {
           <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
             <iframe
               className="absolute top-0 left-0 w-full h-full rounded-lg"
-              src={`https://www.youtube.com/embed/${videoId}`}
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
               title="Suggested Song"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
