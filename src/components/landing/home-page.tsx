@@ -29,7 +29,7 @@ export default function LandingPage() {
               <p className="mt-6 text-neutral-300 max-w-lg text-lg">
                 Embark on a journey of self-discovery with AI-powered
                 journaling, mood tracking, and personalized wellness activities.
-                Let MindfulPath guide you towards better mental health, one step
+                Let Serenity AI guide you towards better mental health, one step
                 at a time.
               </p>
               <div className="mt-8 flex gap-4">
