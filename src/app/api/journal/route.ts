@@ -125,24 +125,11 @@ export async function POST(request: Request) {
     // Get raw response and parse it safely
     const rawResponse = await flaskResponse.text()
     console.log('Raw Flask API response:', rawResponse)
-    // Extract the JSON content from the response
-    // This handles the case where the response is wrapped in quotes
-    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('Invalid JSON response format')
-    }
     
-    let jsonStr = jsonMatch[0]
-      .replace(/\\n/g, '') // Remove escaped newlines
-      .replace(/\\r/g, '') // Remove escaped carriage returns
-      .replace(/\\/g, '') // Remove remaining backslashes
-      .replace(/"\{/g, '{') // Remove leading quote before curly brace
-      .replace(/\}"/g, '}') // Remove trailing quote after curly brace
-      .replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))) // Handle unicode escapes
-    
-    // Parse the cleaned JSON
-    const flaskData = JSON.parse(jsonStr)
-    console.log('Flask API Processed Data:', flaskData)
+    // Use our new parsing function
+    const flaskData = JSON.parse(rawResponse)
+    // const flaskData = await parseFlaskResponse(rawResponse);
+    // console.log('Parsed Flask API Data:', flaskData);
 
     // Generate tags using the helper function
     const tags = await generateTags(content)
@@ -207,5 +194,42 @@ export async function POST(request: Request) {
       { error: 'Failed to create journal' },
       { status: 500 }
     )
+  }
+}
+
+async function parseFlaskResponse(rawResponse: string): Promise<any> {
+  try {
+    // First try direct JSON parse
+    try {
+      return JSON.parse(rawResponse);
+    } catch (e) {
+      // If direct parse fails, continue with cleanup
+      console.log("Direct parse failed, attempting cleanup...");
+    }
+
+    // Remove any leading/trailing quotes if they exist
+    let cleanResponse = rawResponse.trim();
+    if (cleanResponse.startsWith('"') && cleanResponse.endsWith('"')) {
+      cleanResponse = cleanResponse.slice(1, -1);
+    }
+
+    // Handle escaped JSON string
+    cleanResponse = cleanResponse
+      // Handle double-escaped quotes
+      .replace(/\\"/g, '"')
+      // Handle escaped newlines and carriage returns
+      .replace(/\\n/g, ' ')
+      .replace(/\\r/g, ' ')
+      // Handle unicode escapes
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => 
+        String.fromCharCode(parseInt(code, 16)))
+      // Remove any remaining unnecessary escapes
+      .replace(/\\/g, '');
+
+    // Try parsing the cleaned response
+    return JSON.parse(cleanResponse);
+  } catch (error) {
+    console.error('Failed to parse Flask response:', error);
+    throw new Error('Invalid response format from Flask API');
   }
 }
