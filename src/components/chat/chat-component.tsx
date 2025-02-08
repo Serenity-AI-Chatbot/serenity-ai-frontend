@@ -436,7 +436,7 @@ export default function ChatComponent() {
               htmlFor="voice-response"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
             >
-              🔈 Enable AI voice responses
+              🔈 Enable AI voice responses(will only work when given voice input)
             </label>
           </div>
           {isVoiceResponseEnabled && (

@@ -3,9 +3,13 @@ import { notFound } from 'next/navigation';
 
 async function getJournal(id: string) {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/journal/${id}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/api/journal/${id}`, {
       cache: 'no-store',
     });
+
+    console.log("================================================")
+    console.log(`${process.env.NEXT_PUBLIC_API_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/api/journal/${id}`)
+    console.log("================================================")
 
     if (!res.ok) {
       if (res.status === 404) {

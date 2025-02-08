@@ -63,6 +63,9 @@ const getYouTubeVideoId = (url: string) => {
 };
 
 export function JournalDetail({ journal }: JournalDetailProps) {
+  console.log("================================================")
+  console.log("process.env.NEXT_PUBLIC_API_URL", process.env.NEXT_PUBLIC_API_URL)
+  console.log("================================================")
   const router = useRouter();
   const suggestions = getJournalSuggestions(journal);
   console.log(journal);
