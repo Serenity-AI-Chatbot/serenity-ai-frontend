@@ -15,8 +15,14 @@ async function generateEmbedding(journalEntry: any): Promise<number[]> {
     Summary: ${journalEntry.summary}
     Mood Tags: ${journalEntry.mood_tags?.join(', ')}
     Keywords: ${journalEntry.keywords?.join(', ')}
+    Song: ${journalEntry.song}
     Tags: ${journalEntry.tags?.join(', ')}
   `.trim()
+  
+  console.log("================================================")
+  console.log("textForEmbedding", textForEmbedding)
+  console.log("================================================")
+
   const result = await model.embedContent(textForEmbedding)
   const embedding = result.embedding.values
   return embedding

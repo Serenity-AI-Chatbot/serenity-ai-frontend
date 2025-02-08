@@ -427,6 +427,7 @@ RETURNS TABLE (
     mood_tags TEXT[],
     tags TEXT[],
     keywords TEXT[],
+    song TEXT,
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -441,6 +442,7 @@ BEGIN
         j.mood_tags,
         j.tags,
         j.keywords,
+        j.song,
         j.created_at
     FROM journals j
     WHERE j.user_id = get_journals_by_date.p_user_id
@@ -475,6 +477,7 @@ RETURNS TABLE (
     mood_tags TEXT[],
     tags TEXT[],
     keywords TEXT[],
+    song TEXT,
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -489,6 +492,7 @@ BEGIN
         j.mood_tags,
         j.tags,
         j.keywords,
+        j.song,
         j.created_at
     FROM journals j
     WHERE j.user_id = p_user_id

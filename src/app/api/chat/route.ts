@@ -37,6 +37,7 @@ interface Activity {
     title: string;
     content: string;
     summary: string;
+    song: string;
     mood_tags: string[];
     tags: string[];
     keywords: string[];
@@ -281,7 +282,8 @@ function formatJournalEntries(entries: JournalEntry[] | null | undefined) {
     Summary: ${entry.summary || 'No summary'}
     Mood Tags: ${(entry.mood_tags || []).join(", ") || 'No mood tags'}
     Tags: ${(entry.tags || []).join(", ") || 'No tags'}
-    Keywords: ${(entry.keywords || []).join(", ") || 'No keywords'}`)
+    Keywords: ${(entry.keywords || []).join(", ") || 'No keywords'}
+    Song: ${entry.song || 'No song'}`)
     .join("\n\n");
 
   console.log("================================================")

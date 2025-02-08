@@ -25,8 +25,13 @@ Mood Tags: ${journalEntry.mood_tags.join(', ')}
 Tags: ${journalEntry.tags.join(', ')}
 Keywords: ${journalEntry.keywords ? journalEntry.keywords.join(', ') : ''}
 Summary: ${journalEntry.summary || ''}
+Song: ${journalEntry.song || ''}
 `.trim();
 
+    console.log("================================================")
+    console.log("contextString", contextString)
+    console.log("================================================")
+    
     const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
     const result = await model.embedContent(contextString);
     return result.embedding.values;
