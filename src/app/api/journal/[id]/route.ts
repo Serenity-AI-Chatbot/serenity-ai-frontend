@@ -17,6 +17,7 @@ export async function GET(
       title,
       summary,
       keywords,
+      song,
       nearby_places,
       latest_articles
     `)
@@ -37,6 +38,7 @@ export async function GET(
     date: data.created_at,
     mood: data.mood_tags ? data.mood_tags.join(', ') : 'No mood recorded',
     entry: data.content,
+    song: data.song,
     title: data.title,
     summary: data.summary,
     keywords: data.keywords || [],

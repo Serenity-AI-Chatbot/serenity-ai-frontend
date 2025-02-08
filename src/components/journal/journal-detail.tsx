@@ -1,34 +1,42 @@
-"use client"
+"use client";
 
-import { ArrowLeft, Calendar, MapPin, ImageIcon, Newspaper } from "lucide-react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
+import {
+  ArrowLeft,
+  Calendar,
+  MapPin,
+  ImageIcon,
+  Newspaper,
+  Music,
+} from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 interface JournalDetailProps {
   journal: {
-    id: string
-    date: string
-    mood: string
-    entry: string
-    title?: string
-    summary?: string
-    keywords: string[]
+    id: string;
+    date: string;
+    mood: string;
+    entry: string;
+    title?: string;
+    summary?: string;
+    keywords: string[];
+    song: string;
     nearbyPlaces: {
       places: Array<{
-        name: string
-        rating: number
-        address: string
-        user_ratings_total: number
-      }>
-    }
+        name: string;
+        rating: number;
+        address: string;
+        user_ratings_total: number;
+      }>;
+    };
     latestArticles: {
       articles: Array<{
-        link: string
-        title: string
-        snippet: string
-      }>
-    }
-  }
+        link: string;
+        title: string;
+        snippet: string;
+      }>;
+    };
+  };
 }
 
 const getJournalSuggestions = (journal: JournalDetailProps["journal"]) => {
@@ -36,19 +44,29 @@ const getJournalSuggestions = (journal: JournalDetailProps["journal"]) => {
     "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1476611317561-60117649dd94?w=800&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop",
-  ]
+  ];
 
   return {
     photos: defaultPhotos,
     places: journal.nearbyPlaces.places,
     keywords: journal.keywords || [],
     articles: journal.latestArticles.articles,
-  }
-}
+  };
+};
+
+// Helper function to extract YouTube video ID
+const getYouTubeVideoId = (url: string) => {
+  const regex =
+    /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
 
 export function JournalDetail({ journal }: JournalDetailProps) {
-  const router = useRouter()
-  const suggestions = getJournalSuggestions(journal)
+  const router = useRouter();
+  const suggestions = getJournalSuggestions(journal);
+  console.log(journal);
+  const videoId = getYouTubeVideoId(journal.song);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -83,12 +101,16 @@ export function JournalDetail({ journal }: JournalDetailProps) {
         </div>
 
         {journal.title && (
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-500 mb-4">{journal.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-500 mb-4">
+            {journal.title}
+          </h1>
         )}
 
         {journal.summary && (
           <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-            <p className="text-gray-700 dark:text-emerald-400 italic">{journal.summary}</p>
+            <p className="text-gray-700 dark:text-emerald-400 italic">
+              {journal.summary}
+            </p>
           </div>
         )}
 
@@ -111,15 +133,40 @@ export function JournalDetail({ journal }: JournalDetailProps) {
         )}
       </div>
 
+      {videoId && (
+        <div className="bg-white dark:bg-black rounded-lg shadow-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Music className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-emerald-500">
+              Suggested Song
+            </h2>
+          </div>
+          <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+            <iframe
+              className="absolute top-0 left-0 w-full h-full rounded-lg"
+              src={`https://www.youtube.com/embed/${videoId}`}
+              title="Suggested Song"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
+
       {/* Suggested photos */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
           <ImageIcon className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-xl font-semibold text-gray-900">Related Imagery</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Related Imagery
+          </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {suggestions.photos.map((photo, index) => (
-            <div key={index} className="relative h-48 rounded-lg overflow-hidden">
+            <div
+              key={index}
+              className="relative h-48 rounded-lg overflow-hidden"
+            >
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`Suggestion ${index + 1}`}
@@ -147,7 +194,8 @@ export function JournalDetail({ journal }: JournalDetailProps) {
               <h3 className="font-medium text-gray-900">{place.name}</h3>
               <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
                 <span>
-                  ⭐ {place.rating.toFixed(1)} ({place.user_ratings_total} reviews)
+                  ⭐ {place.rating.toFixed(1)} ({place.user_ratings_total}{" "}
+                  reviews)
                 </span>
               </div>
               <p className="mt-1 text-sm text-gray-500">{place.address}</p>
@@ -160,7 +208,9 @@ export function JournalDetail({ journal }: JournalDetailProps) {
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
           <Newspaper className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-xl font-semibold text-gray-900">Latest Articles</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Latest Articles
+          </h2>
         </div>
         <div className="space-y-4">
           {suggestions.articles.map((article, index) => (
@@ -179,6 +229,5 @@ export function JournalDetail({ journal }: JournalDetailProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

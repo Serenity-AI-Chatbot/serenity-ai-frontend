@@ -279,6 +279,9 @@ async function seedJournals() {
             // Generate summary and keywords first
             const summary = await generateSummary(entry.content);
             const keywords = await extractKeywords(entry.content);
+
+            // Get appropriate song based on mood
+            const song = getSongForMood(entry.mood_tags);
             
             // Create the complete journal entry object
             const journalEntry = {
@@ -289,6 +292,7 @@ async function seedJournals() {
                 mood_tags: entry.mood_tags,
                 keywords,
                 tags: entry.tags,
+                song,
                 created_at: new Date(currentDate.getTime() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000))
             };
 
@@ -380,6 +384,35 @@ async function seedUserActivities(activities) {
         console.error('Detailed user activities seeding error:', error);
         throw error;
     }
+}
+
+// Add this constant at the top of your file after other constants
+const MENTAL_PEACE_SONGS = [
+    'https://www.youtube.com/watch?v=F-6qLrgbjKo', // Default meditation song
+    'https://www.youtube.com/watch?v=lFcSrYw-ARY', // Peaceful meditation music
+    'https://www.youtube.com/watch?v=77ZozI0rw7w', // Relaxing piano music
+    'https://www.youtube.com/watch?v=1ZYbU82GVz4', // Calming nature sounds
+    'https://www.youtube.com/watch?v=WZKW2Hq2fks', // Zen meditation music
+    'https://www.youtube.com/watch?v=2OEL4P1Rz04', // Deep sleep music
+    'https://www.youtube.com/watch?v=lCOF9LN_Zxs', // Relaxing guitar music
+    'https://www.youtube.com/watch?v=hlWiI4xVXKY', // Stress relief music
+    'https://www.youtube.com/watch?v=9EKi2E9dVY8', // Ambient meditation
+    'https://www.youtube.com/watch?v=XqeJ1kTlvWY'  // Peaceful flute music
+];
+
+// Function to get a song based on mood
+function getSongForMood(moodTags) {
+    // If the mood is peaceful, mindful, or related to meditation, higher chance of getting meditation-specific music
+    const meditativeMoods = ['peaceful', 'mindful', 'centered', 'calm', 'reflective'];
+    const hasMeditativeMood = moodTags.some(mood => meditativeMoods.includes(mood));
+    
+    if (hasMeditativeMood) {
+        // Higher chance of getting first few songs which are more meditation-focused
+        return MENTAL_PEACE_SONGS[Math.floor(Math.random() * 5)];
+    }
+    
+    // Otherwise, return any random song from the list
+    return MENTAL_PEACE_SONGS[Math.floor(Math.random() * MENTAL_PEACE_SONGS.length)];
 }
 
 // Main Seeding Function

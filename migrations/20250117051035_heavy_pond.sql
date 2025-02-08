@@ -14,6 +14,9 @@ CREATE TABLE journals (
     -- Mood Tracking Integration
     mood_tags TEXT[], -- AI-predicted mood labels, e.g., ['anxious', 'hopeful', 'tired']
     
+    -- Music Integration
+    song TEXT DEFAULT 'https://www.youtube.com/watch?v=F-6qLrgbjKo', -- Default YouTube song link
+    
     -- AI-powered insights
     embedding VECTOR(768),
     keywords TEXT[], -- Extracted keywords

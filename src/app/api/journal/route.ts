@@ -151,6 +151,7 @@ export async function POST(request: Request) {
       mood_tags: flaskData.predictions,
       keywords: flaskData.keywords,
       tags,
+      song: flaskData.song || 'https://www.youtube.com/watch?v=F-6qLrgbjKo',
       created_at: new Date().toISOString(),
     }
 
