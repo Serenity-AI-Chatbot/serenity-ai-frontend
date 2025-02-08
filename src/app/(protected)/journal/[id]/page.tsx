@@ -1,41 +1,45 @@
-import { JournalDetail } from '@/components/journal/journal-detail';
-import { notFound } from 'next/navigation';
+import { JournalDetail } from "@/components/journal/journal-detail";
+import { supabase } from "@/lib/supabase-server";
+import { notFound } from "next/navigation";
 
 async function getJournal(id: string) {
   try {
-    // Determine the base URL with proper protocol
-    let baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!baseUrl) {
-      // If VERCEL_URL is available, use it with https protocol
-      if (process.env.VERCEL_URL) {
-        baseUrl = `https://${process.env.VERCEL_URL}`;
-      } else {
-        baseUrl = 'http://localhost:3000';
-      }
-    }
+    const { data, error } = await supabase
+      .from("journals")
+      .select(
+        `
+      id, 
+      created_at, 
+      mood_tags, 
+      content, 
+      title,
+      summary,
+      keywords,
+      song,
+      nearby_places,
+      latest_articles
+    `
+      )
+      .eq("id", id)
+      .single();
 
-    // Ensure baseUrl doesn't end with a slash
-    baseUrl = baseUrl.replace(/\/$/, '');
+    const journal = {
+      id: data?.id,
+      date: data?.created_at,
+      mood: data?.mood_tags ? data?.mood_tags.join(", ") : "No mood recorded",
+      entry: data?.content,
+      song: data?.song,
+      title: data?.title,
+      summary: data?.summary,
+      keywords: data?.keywords || [],
+      nearbyPlaces: data?.nearby_places || [],
+      latestArticles: data?.latest_articles || [],
+    };
 
-    const url = `${baseUrl}/api/journal/${id}`;
-    
-    console.log("================================================");
-    console.log("Fetching from URL:", url);
-    console.log("================================================");
+    return journal;
 
-    const res = await fetch(url, {
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      if (res.status === 404) {
-        return null;
-      }
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-    return res.json();
   } catch (error) {
-    console.error('Error fetching journal:', error);
+    console.error("Error fetching journal:", error);
     return null;
   }
 }
@@ -47,7 +51,7 @@ type Props = {
 export default async function JournalPage({ params }: Props) {
   const { id } = await params;
   const journal = await getJournal(id);
-  
+
   if (!journal) {
     notFound();
   }
@@ -56,7 +60,7 @@ export default async function JournalPage({ params }: Props) {
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">
-          {journal.title || 'Mental Wellness Journal'}
+          {journal.title || "Mental Wellness Journal"}
         </h1>
         <JournalDetail journal={journal} />
       </div>
