@@ -321,7 +321,8 @@ async function seedJournals() {
                         address: faker.location.streetAddress() + ", " + faker.location.city(),
                         rating: faker.number.float({ min: 3.5, max: 5.0, precision: 0.1 }),
                         types: ["park", "point_of_interest", "establishment"],
-                        user_ratings_total: faker.number.int({ min: 10, max: 8000 })
+                        user_ratings_total: faker.number.int({ min: 10, max: 8000 }),
+                        image_url: faker.image.url('park')
                     }))
                 },
                 sentences: entry.content

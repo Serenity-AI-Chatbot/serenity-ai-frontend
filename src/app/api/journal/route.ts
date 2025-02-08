@@ -165,6 +165,7 @@ export async function POST(request: Request) {
         types: place.types,
         rating: place.rating,
         address: place.address,
+        image_url: place.image,
         user_ratings_total: place.user_ratings_total
       }))},
       sentences: flaskData.sentences,
