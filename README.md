@@ -44,6 +44,7 @@ https://github.com/Serenity-AI-Chatbot/serenity-ai-ml
 #### Journal Interface
 ![Journal Interface](https://github.com/user-attachments/assets/ee1bea8c-727d-4002-8811-aa272f1eca69)
 ![Journal Interface](https://github.com/user-attachments/assets/469d47fe-08e0-4fb0-8ddb-0eb84072dd72)
+![Journal Interface](https://github.com/user-attachments/assets/0ab65c5b-3f15-44b5-ad03-e0e7795260ce)
 ![Journal Interface](https://github.com/user-attachments/assets/9e040686-034d-4512-b773-b4a8272ede6d)
 - AI-powered journaling
 - Emotion detection
