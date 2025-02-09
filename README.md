@@ -42,7 +42,9 @@ https://github.com/Serenity-AI-Chatbot/serenity-ai-ml
 - Recommended activities
 
 #### Journal Interface
-![Journal Interface](https://github.com/user-attachments/assets/90be097d-d44f-4b6a-a283-cde54da37324)
+![Journal Interface](https://github.com/user-attachments/assets/ee1bea8c-727d-4002-8811-aa272f1eca69)
+![Journal Interface](https://github.com/user-attachments/assets/469d47fe-08e0-4fb0-8ddb-0eb84072dd72)
+![Journal Interface](https://github.com/user-attachments/assets/9e040686-034d-4512-b773-b4a8272ede6d)
 - AI-powered journaling
 - Emotion detection
 - Real-time insights
@@ -56,7 +58,9 @@ https://github.com/Serenity-AI-Chatbot/serenity-ai-ml
 - Achievement system
 
 ### Character Interface
-![Character Interface](https://github.com/user-attachments/assets/c46e663d-ce29-4b1c-9a00-e75992bd0cc8)
+![Character Interface](https://github.com/user-attachments/assets/3f77c98c-c3cf-43cf-9de5-2fe9c5512d0a)
+![Character Interface](https://github.com/user-attachments/assets/fb55b0d2-5304-420d-8c29-0d8553c1a91a)
+![Character Interface](https://github.com/user-attachments/assets/18f66098-81fd-4111-b504-5c6571145826)
 - Interactive Chat Bot which can be used to talk to the user
 - with all the context of the user's mood and journal entries
 
@@ -137,6 +141,9 @@ mental-health-app/
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+GEMINI_API_KEY=your_gemini_api_key
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+FASTAPI_API_URL=your_fastapi_api_url
 ```
 
 ### 2. Google Gemini AI Setup
@@ -254,6 +261,53 @@ Comprehensive analytics function providing:
   - Total counts
   - Most common moods
   - Activity engagement
+
+### 5. get_journals_by_date()
+**Function:** `get_journals_by_date`
+
+**Description:**
+Retrieves journal entries for a specific user, optionally filtered by year and month. This function allows users to fetch their journal entries within a particular time frame, making it easier to review and analyze past entries.
+
+**Parameters:**
+- `p_user_id UUID`: The unique identifier of the user.
+- `p_year INT DEFAULT NULL`: (Optional) The year to filter journal entries.
+- `p_month INT DEFAULT NULL`: (Optional) The month to filter journal entries.
+- `p_limit INT DEFAULT 50`: (Optional) The maximum number of journal entries to return.
+
+**Returns:**
+A table containing the following fields:
+- `id UUID`: The unique identifier of the journal entry.
+- `title TEXT`: The title of the journal entry.
+- `content TEXT`: The main content of the journal entry.
+- `summary TEXT`: An AI-generated summary of the journal entry.
+- `mood_tags TEXT[]`: Array of mood tags associated with the entry.
+- `tags TEXT[]`: Additional tags for categorization.
+- `keywords TEXT[]`: Extracted keywords from the entry.
+- `song TEXT`: Link to a related song.
+- `created_at TIMESTAMP WITH TIME ZONE`: The timestamp when the entry was created.
+
+### 6. get_journal_stats_by_period()
+**Function:** `get_journal_stats_by_period`
+
+**Description:**
+Fetches journal entries for a user within a specified date range. This function is useful for generating reports and analytics based on user activity over a particular period.
+
+**Parameters:**
+- `p_user_id UUID`: The unique identifier of the user.
+- `p_start_date DATE`: The start date of the period.
+- `p_end_date DATE`: The end date of the period.
+
+**Returns:**
+A table containing the following fields:
+- `id UUID`: The unique identifier of the journal entry.
+- `title TEXT`: The title of the journal entry.
+- `content TEXT`: The main content of the journal entry.
+- `summary TEXT`: An AI-generated summary of the journal entry.
+- `mood_tags TEXT[]`: Array of mood tags associated with the entry.
+- `tags TEXT[]`: Additional tags for categorization.
+- `keywords TEXT[]`: Extracted keywords from the entry.
+- `song TEXT`: Link to a related song.
+- `created_at TIMESTAMP WITH TIME ZONE`: The timestamp when the entry was created.
 
 ## 🔒 Security Features
 
