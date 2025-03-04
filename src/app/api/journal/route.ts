@@ -30,7 +30,7 @@ async function generateEmbedding(journalEntry: any): Promise<number[]> {
 
 // Helper function for generating tags
 async function generateTags(content: string): Promise<string[]> {
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
   const prompt = `Generate 3-5 relevant tags for this journal entry. Return ONLY a JSON array of strings, with no markdown formatting or explanation. Example: ["tag1", "tag2", "tag3"]. For this content: ${content}`
   const result = await model.generateContent(prompt)
   const response = await result.response
