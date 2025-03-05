@@ -172,8 +172,8 @@ export default function ChatComponent() {
         return updatedMessages;
       });
 
-      // Only speak after the entire message is received and streaming is complete
-      if (isVoiceMode && isVoiceResponseEnabled) {
+      // Only speak if voice response is enabled, regardless of input method
+      if (isVoiceResponseEnabled) {
         await speakText(assistantMessage);
       }
 
@@ -436,7 +436,7 @@ export default function ChatComponent() {
               htmlFor="voice-response"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
             >
-              🔈 Enable AI voice responses(will only work when given voice input)
+              🔈 Enable AI voice responses
             </label>
           </div>
           {isVoiceResponseEnabled && (
