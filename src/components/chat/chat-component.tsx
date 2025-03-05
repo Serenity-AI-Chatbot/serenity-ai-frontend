@@ -249,8 +249,7 @@ export default function ChatComponent() {
       console.error("Error generating speech:", error);
       toast({
         title: "Speech Generation Error",
-        description:
-          "Failed to generate voice response. Please check your API key.",
+        description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
     }
