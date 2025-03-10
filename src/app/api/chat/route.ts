@@ -73,6 +73,12 @@ interface MoodAnalysis {
   }>;
 }
 
+interface ChatMessage {
+  role: "user" | "model";
+  content: string;
+}
+
+
 // Add interface for activity recommendation
 interface ActivityRecommendation {
   activity: Activity;
@@ -83,38 +89,46 @@ interface ActivityRecommendation {
 
 export async function POST(req: Request) {
   if (!process.env.GEMINI_API_KEY) {
-    return new Response("Missing API key", { status: 500 })
+    return new Response("Missing API key", { status: 500 });
   }
 
-  const { messages } = await req.json()
-  const { session } = await requireAuth()
-  
+  const { messages }: { messages: ChatMessage[] } = await req.json();
+  const { session } = await requireAuth();
+
   if (!session) {
-    return new Response("Unauthorized", { status: 401 })
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  const userId = session.user.id
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
-  const latestUserMessage = messages[messages.length - 1].content
+  const userId = session.user.id;
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const latestUserMessage = messages[messages.length - 1]?.content || "";
 
   try {
     // Get journal entries based on user message
-    const { entries, moodAnalysis, recommendations } = await fetchRelevantJournalEntries(userId, latestUserMessage)
+    const { entries, moodAnalysis, recommendations } = await fetchRelevantJournalEntries(userId, latestUserMessage);
     
+    // Fetch chat history
+    const chatHistory = messages.slice(0, messages.length - 1)
+      .map((msg: ChatMessage) => `${msg.role}: ${msg.content}`)
+      .join("\n");
+
     // Fetch and format activities
-    const activities = await fetchActivities()
-    
+    const activities = await fetchActivities();
+
     // Format contexts
-    const journalContext = formatJournalEntries(entries)
-    const activitiesContext = formatActivities(activities)
-    
+    const journalContext = formatJournalEntries(entries);
+    const activitiesContext = formatActivities(activities);
+
     // Prepare and send chat message
-    const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext, moodAnalysis, recommendations)
-    return await streamChatResponse(model, geminiMessages, latestUserMessage)
+    const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext, moodAnalysis, recommendations, chatHistory);
+    
+    return await streamChatResponse(model, geminiMessages, latestUserMessage);
   } catch (error) {
-    return handleError(error)
+    return handleError(error);
   }
 }
+
+
 
 async function fetchRelevantJournalEntries(userId: string, userMessage: string) {
   const queryEmbedding = await generateEmbedding(userMessage);
@@ -344,7 +358,14 @@ function formatMoodProgression(moodProgression: Array<{ date: string; moods: Rec
   }).join('\n');
 }
 
-function prepareChatMessages(messages: any[], journalContext: string, activitiesContext: string, moodAnalysis: MoodAnalysis, recommendations: ActivityRecommendation[]) {
+function prepareChatMessages(
+  messages: any[], 
+  journalContext: string, 
+  activitiesContext: string, 
+  moodAnalysis: MoodAnalysis, 
+  recommendations: ActivityRecommendation[], 
+  chatHistory: string
+) {
   const enhancedContext = `
     Journal Context:
     ${journalContext}
@@ -364,6 +385,9 @@ function prepareChatMessages(messages: any[], journalContext: string, activities
     
     Available Activities:
     ${activitiesContext}
+    
+    Chat History:
+    ${chatHistory}
   `
 
   return [
@@ -382,6 +406,7 @@ function prepareChatMessages(messages: any[], journalContext: string, activities
     })),
   ]
 }
+
 
 async function streamChatResponse(model: any, geminiMessages: any[], userMessage: string) {
   const chat = model.startChat({ history: geminiMessages })
