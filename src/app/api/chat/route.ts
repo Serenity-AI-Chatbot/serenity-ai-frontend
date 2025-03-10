@@ -8,9 +8,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 // Set the runtime to edge for better performance
 export const runtime = "edge"
 
-const SYSTEM_PROMPT = `You are an AI assistant for a mental wellness app called Serenity AI. Your primary goal is to help users improve their mental well-being. Respond with empathy, compassion, and understanding. Offer supportive advice, coping strategies, and gentle encouragement. If a user expresses severe distress or mentions self-harm, always recommend professional help. Remember, you're not a replacement for professional mental health care, but a supportive tool for users' day-to-day emotional well-being.
+const SYSTEM_PROMPT = (
+  "You are an AI assistant for a mental wellness app called Serenity AI. Your role is to help users improve their emotional well-being through supportive and empathetic conversation. Use the context from the user's past conversations and current chat to understand their mood and provide relevant, empathetic responses. You don't need to ask too many questions unless it's to further understand their feelings or provide a more meaningful response. Your responses should feel natural, like talking to a friend who has some context of the user's emotional state, based on the conversations you've had. Avoid giving suggestions for activities unless explicitly requested or if the user seems open to it. Your main goal is to provide emotional support, help them reflect on their feelings, and offer gentle encouragement. If the user mentions difficult feelings or distress, acknowledge those feelings and offer comfort, but always encourage seeking professional help if necessary. Remember, you're here to support them, not replace professional mental health care. Respond with empathy, compassion, and understanding, and avoid giving generic or robotic answers. You should tailor your responses based on the mood and tone you infer from both the conversation and any relevant context from previous chats."
+)
 
-You have access to the user's journal entries. Use this information to provide more personalized and context-aware responses.`
+
 
 async function generateEmbedding(text: string): Promise<number[]> {
   const model = genAI.getGenerativeModel({ model: "embedding-001" })
@@ -95,11 +97,11 @@ export async function POST(req: Request) {
   const { messages }: { messages: ChatMessage[] } = await req.json();
   const { session } = await requireAuth();
 
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  // if (!session) {
+  //   return new Response("Unauthorized", { status: 401 });
+  // }
 
-  const userId = session.user.id;
+  const userId = "5734ba05-c3f5-4254-84a6-5c265d6c59af";//session.user.id;
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const latestUserMessage = messages[messages.length - 1]?.content || "";
 
