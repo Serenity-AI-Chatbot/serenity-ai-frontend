@@ -117,46 +117,74 @@ export async function POST(req: Request) {
 }
 
 async function fetchRelevantJournalEntries(userId: string, userMessage: string) {
-  const queryEmbedding = await generateEmbedding(userMessage)
-  
+  const queryEmbedding = await generateEmbedding(userMessage);
+
   try {
     // Check for date range pattern first
-    const dateRangeMatch = userMessage.match(datePatterns.dateRange)
+    const dateRangeMatch = userMessage.match(datePatterns.dateRange);
     if (dateRangeMatch) {
-      const result = await fetchJournalsByDateRange(userId, dateRangeMatch)
+      const result = await fetchJournalsByDateRange(userId, dateRangeMatch);
       return {
         entries: Array.isArray(result) ? result : [],
         moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-        recommendations: []  // You can implement this based on your needs
-      }
+        recommendations: [],
+      };
     }
-    
-    const monthYearMatch = userMessage.match(datePatterns.monthYear)
+
+    const monthYearMatch = userMessage.match(datePatterns.monthYear);
     if (monthYearMatch) {
-      const result = await fetchJournalsByMonthYear(userId, monthYearMatch)
+      const result = await fetchJournalsByMonthYear(userId, monthYearMatch);
       return {
         entries: Array.isArray(result) ? result : [],
         moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-        recommendations: []
-      }
+        recommendations: [],
+      };
     }
+
+    const dateMatch = userMessage.match(datePatterns.specificDate);
     
-    const dateMatch = userMessage.match(datePatterns.specificDate)
-    const result = await fetchJournalsByDateOrSemantic(userId, dateMatch, queryEmbedding)
-    return {
-      entries: Array.isArray(result) ? result : [],
-      moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-      recommendations: []
+    if (dateMatch) {
+      const result = await fetchJournalsByDateOrSemantic(userId, dateMatch, queryEmbedding);
+      return {
+        entries: Array.isArray(result) ? result : [],
+        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+        recommendations: [],
+      };
     }
+
+    // If no date is found, fetch the latest 3 journals
+    const latestJournals = await fetchLatestJournals(userId, 3);
+    return {
+      entries: Array.isArray(latestJournals) ? latestJournals : [],
+      moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
+      recommendations: [],
+    };
   } catch (error) {
-    console.error("Error fetching journal entries:", error)
+    console.error("Error fetching journal entries:", error);
     return {
       entries: [],
       moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-      recommendations: []
-    }
+      recommendations: [],
+    };
   }
 }
+
+
+async function fetchLatestJournals(userId: string, limit: number) {
+  const { data, error } = await supabase
+    .from("journals")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Error fetching latest journals:", error);
+    return [];
+  }
+  return data;
+}
+
 
 async function fetchJournalsByMonthYear(userId: string, match: RegExpMatchArray) {
   const [monthStr, yearStr] = [match[1], match[2]]
