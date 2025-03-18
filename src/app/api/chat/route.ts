@@ -97,11 +97,11 @@ export async function POST(req: Request) {
   const { messages }: { messages: ChatMessage[] } = await req.json();
   const { session } = await requireAuth();
 
-  // if (!session) {
-  //   return new Response("Unauthorized", { status: 401 });
-  // }
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
 
-  const userId = "5734ba05-c3f5-4254-84a6-5c265d6c59af";//session.user.id;
+  const userId = session.user.id;
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const latestUserMessage = messages[messages.length - 1]?.content || "";
 
