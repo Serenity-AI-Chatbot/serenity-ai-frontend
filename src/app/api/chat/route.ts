@@ -76,10 +76,21 @@ interface MoodAnalysis {
 }
 
 interface ChatMessage {
-  role: "user" | "model";
+  id?: string;
+  chat_id?: string;
+  role: "user" | "model" | "assistant";
   content: string;
+  created_at?: string;
 }
 
+// Interface for chat details
+interface Chat {
+  id?: string;
+  user_id?: string;
+  title: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 // Add interface for activity recommendation
 interface ActivityRecommendation {
@@ -94,7 +105,7 @@ export async function POST(req: Request) {
     return new Response("Missing API key", { status: 500 });
   }
 
-  const { messages }: { messages: ChatMessage[] } = await req.json();
+  const { messages, chatId }: { messages: ChatMessage[], chatId?: string } = await req.json();
   const { session } = await requireAuth();
 
   if (!session) {
@@ -124,12 +135,81 @@ export async function POST(req: Request) {
     // Prepare and send chat message
     const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext, moodAnalysis, recommendations, chatHistory);
     
-    return await streamChatResponse(model, geminiMessages, latestUserMessage);
+    // Create or update chat in database
+    let currentChatId = chatId;
+    
+    if (!currentChatId) {
+      // Create a new chat with title derived from user's first message
+      const title = generateChatTitle(latestUserMessage);
+      const { data: chatData, error: chatError } = await supabase
+        .from('chats')
+        .insert({
+          user_id: userId,
+          title: title
+        })
+        .select('id')
+        .single();
+      
+      if (chatError) throw chatError;
+      currentChatId = chatData.id;
+    } else {
+      // Update the existing chat's timestamp
+      await supabase
+        .from('chats')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentChatId)
+        .eq('user_id', userId);
+    }
+    
+    // Save the user message to the database
+    const userMessageData = {
+      chat_id: currentChatId,
+      role: 'user',
+      content: latestUserMessage
+    };
+    
+    await supabase.from('chat_messages').insert(userMessageData);
+    
+    // At this point, currentChatId is guaranteed to be a string
+    return await streamChatResponseWithSave(model, geminiMessages, latestUserMessage, currentChatId as string);
   } catch (error) {
     return handleError(error);
   }
 }
 
+// Generate a title for the chat based on the first message
+function generateChatTitle(message: string): string {
+  // Truncate to first 30 characters if longer than 30
+  let title = message.slice(0, 30);
+  if (message.length > 30) {
+    title += '...';
+  }
+  return title;
+}
+
+// Create a new endpoint for fetching user's chats
+export async function GET(req: Request) {
+  const { session } = await requireAuth();
+  
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  
+  const userId = session.user.id;
+  
+  try {
+    const { data, error } = await supabase
+      .rpc('get_user_chats', { p_user_id: userId });
+      
+    if (error) throw error;
+    
+    return new Response(JSON.stringify(data), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return handleError(error);
+  }
+}
 
 
 async function fetchRelevantJournalEntries(userId: string, userMessage: string) {
@@ -410,18 +490,35 @@ function prepareChatMessages(
 }
 
 
-async function streamChatResponse(model: any, geminiMessages: any[], userMessage: string) {
+async function streamChatResponseWithSave(model: any, geminiMessages: any[], userMessage: string, chatId: string) {
+  if (!chatId) {
+    throw new Error("Chat ID is required");
+  }
+  
   const chat = model.startChat({ history: geminiMessages })
   const result = await chat.sendMessageStream(userMessage)
   
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        let completeAssistantMessage = '';
+        
         for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          completeAssistantMessage += chunkText;
+          
           const encoder = new TextEncoder()
-          const bytes = encoder.encode(`data: ${JSON.stringify({ text: chunk.text() })}\n\n`)
+          const bytes = encoder.encode(`data: ${JSON.stringify({ text: chunkText, chatId })}\n\n`)
           controller.enqueue(bytes)
         }
+        
+        // Save the complete assistant message to the database
+        await supabase.from('chat_messages').insert({
+          chat_id: chatId,
+          role: 'assistant',
+          content: completeAssistantMessage
+        });
+        
         controller.close()
       } catch (error) {
         controller.error(error)

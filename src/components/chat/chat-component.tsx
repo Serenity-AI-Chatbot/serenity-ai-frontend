@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mic } from "lucide-react";
+import { Loader2, Mic, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -41,8 +41,20 @@ const SUGGESTED_PROMPTS = [
 ];
 
 interface Message {
+  id?: string;
+  chat_id?: string;
   role: "user" | "assistant";
   content: string;
+  created_at?: string;
+}
+
+interface Chat {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message: string;
+  message_count: number;
 }
 
 type VoiceProvider = "elevenlabs" | "webspeech";
@@ -59,6 +71,9 @@ export default function ChatComponent() {
   const [isVoiceResponseEnabled, setIsVoiceResponseEnabled] = useState(false);
   const [voiceProvider, setVoiceProvider] =
     useState<VoiceProvider>("webspeech");
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
   const speechSynthesis =
     typeof window !== "undefined" ? window.speechSynthesis : null;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -66,18 +81,80 @@ export default function ChatComponent() {
   const isPlayingRef = useRef(false);
   const { toast } = useToast();
 
+  // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [scrollAreaRef]);
+  }, [messages]);
 
+  // Fetch user's chats on component mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem("chatMessages");
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
-    }
+    fetchUserChats();
   }, []);
+
+  // Load messages when a chat is selected
+  useEffect(() => {
+    if (currentChatId) {
+      fetchChatMessages(currentChatId);
+    } else {
+      setMessages([]);
+    }
+  }, [currentChatId]);
+
+  const fetchUserChats = async () => {
+    setIsLoadingChats(true);
+    try {
+      const response = await fetch("/api/chat");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setChats(data);
+      
+      // If there are chats, select the most recent one
+      if (data.length > 0) {
+        setCurrentChatId(data[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load chat history",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingChats(false);
+    }
+  };
+
+  const fetchChatMessages = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chat/${chatId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      
+      // Transform messages to the expected format
+      const formattedMessages = data.map((msg: any) => ({
+        id: msg.id,
+        chat_id: msg.chat_id,
+        role: msg.role === "model" ? "assistant" : msg.role,
+        content: msg.content,
+        created_at: msg.created_at
+      }));
+      
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error("Error fetching chat messages:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load messages",
+        variant: "destructive",
+      });
+    }
+  };
 
   const stopCurrentAudio = () => {
     if (currentAudioRef.current) {
@@ -107,11 +184,7 @@ export default function ChatComponent() {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => {
-      const updatedMessages = [...prev, userMessage];
-      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
-      return updatedMessages;
-    });
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
 
@@ -121,7 +194,10 @@ export default function ChatComponent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: [...messages, userMessage] }),
+        body: JSON.stringify({ 
+          messages: [...messages, userMessage],
+          chatId: currentChatId
+        }),
       });
 
       if (!response.ok) {
@@ -154,6 +230,13 @@ export default function ChatComponent() {
                   ];
                   return updatedMessages;
                 });
+                
+                // Update current chat ID if this is a new chat
+                if (jsonData.chatId && !currentChatId) {
+                  setCurrentChatId(jsonData.chatId);
+                  // Refresh the chat list
+                  fetchUserChats();
+                }
               }
             } catch (error) {
               console.error("Error parsing JSON:", error);
@@ -168,7 +251,6 @@ export default function ChatComponent() {
           ...prev.slice(0, -1),
           { role: "assistant", content: assistantMessage },
         ];
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
         return updatedMessages;
       });
 
@@ -187,7 +269,6 @@ export default function ChatComponent() {
             content: "Sorry, there was an error processing your request.",
           },
         ];
-        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
         return updatedMessages;
       });
     } finally {
@@ -201,7 +282,16 @@ export default function ChatComponent() {
 
   const handleClearChat = () => {
     setMessages([]);
-    localStorage.removeItem("chatMessages");
+    setCurrentChatId(null);
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentChatId(null);
+  };
+
+  const handleSelectChat = (chatId: string) => {
+    setCurrentChatId(chatId);
   };
 
   const handleVoiceInput = (text: string) => {
@@ -307,12 +397,65 @@ export default function ChatComponent() {
     }
   };
 
+  // Format date to a readable string
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <Card className="w-full max-w-3xl mx-auto bg-white dark:bg-black shadow-xl rounded-xl overflow-hidden">
       <CardHeader className="bg-emerald-500 text-white p-6">
-        <CardTitle className="text-2xl font-bold">
-          Chat with Serenity-AI
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-2xl font-bold">
+            Chat with Serenity-AI
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNewChat}
+              className="text-white hover:bg-emerald-600"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Chat
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4">
+          <Select
+            value={currentChatId || ""}
+            onValueChange={handleSelectChat}
+            disabled={isLoadingChats}
+          >
+            <SelectTrigger className="bg-emerald-600 text-white border-emerald-700">
+              <SelectValue placeholder={isLoadingChats ? "Loading chats..." : "Select a conversation"} />
+            </SelectTrigger>
+            <SelectContent>
+              {chats.map((chat) => (
+                <SelectItem key={chat.id} value={chat.id}>
+                  <div className="flex flex-col justify-center items-center">
+                    <span className="font-medium">{chat.title}</span>
+                    {/* <span className="text-xs text-white dark:text-emerald-500/70">
+                      {formatDate(chat.updated_at)} · {chat.message_count} messages
+                    </span> */}
+                  </div>
+                </SelectItem>
+              ))}
+              {chats.length === 0 && !isLoadingChats && (
+                <SelectItem value="empty" disabled>
+                  No conversations yet
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent className="p-6">
         <ScrollArea className="h-[60vh] pr-4" ref={scrollAreaRef}>
