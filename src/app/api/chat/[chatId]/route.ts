@@ -3,8 +3,8 @@ import { requireAuth, supabase } from "@/lib/supabase-server";
 export const runtime = "edge";
 
 export async function GET(
-  req: Request,
-  { params }: { params: { chatId: string } }
+    req: Request,
+    { params }: { params: Promise<{ chatId: string }> }
 ) {
   const { session } = await requireAuth();
 
@@ -13,7 +13,7 @@ export async function GET(
   }
 
   const userId = session.user.id;
-  const chatId = params.chatId;
+  const chatId = (await params).chatId;
 
   if (!chatId) {
     return new Response("Chat ID is required", { status: 400 });
