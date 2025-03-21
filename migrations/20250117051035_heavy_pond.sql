@@ -504,3 +504,149 @@ $$;
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION get_journal_stats_by_period TO authenticated;
 GRANT EXECUTE ON FUNCTION get_journal_stats_by_period TO service_role;
+
+-- Chat Tables for persistent chat history
+CREATE TABLE chats (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id),
+    title TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
+    role TEXT CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_chats_user_id ON chats(user_id);
+CREATE INDEX idx_chat_messages_chat_id ON chat_messages(chat_id);
+
+-- Row Level Security Policies for chats
+CREATE POLICY "Users can view their own chats"
+    ON chats
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own chats"
+    ON chats
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own chats"
+    ON chats
+    FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own chats"
+    ON chats
+    FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- Row Level Security Policies for chat messages
+CREATE POLICY "Users can view their own chat messages"
+    ON chat_messages
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM chats
+            WHERE chats.id = chat_messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert their own chat messages"
+    ON chat_messages
+    FOR INSERT
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM chats
+            WHERE chats.id = chat_messages.chat_id
+            AND chats.user_id = auth.uid()
+        )
+    );
+
+-- Enable Row Level Security
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- Create functions to get user's chats
+CREATE OR REPLACE FUNCTION get_user_chats(
+    p_user_id UUID
+)
+RETURNS TABLE (
+    id UUID,
+    title TEXT,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    last_message TEXT,
+    message_count BIGINT
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        c.id,
+        c.title,
+        c.created_at,
+        c.updated_at,
+        (
+            SELECT cm.content
+            FROM chat_messages cm
+            WHERE cm.chat_id = c.id
+            ORDER BY cm.created_at DESC
+            LIMIT 1
+        ) as last_message,
+        (
+            SELECT COUNT(*)
+            FROM chat_messages cm
+            WHERE cm.chat_id = c.id
+        ) as message_count
+    FROM chats c
+    WHERE c.user_id = p_user_id
+    ORDER BY c.updated_at DESC;
+END;
+$$;
+
+-- Create function to get messages for a specific chat
+CREATE OR REPLACE FUNCTION get_chat_messages(
+    p_chat_id UUID,
+    p_user_id UUID
+)
+RETURNS TABLE (
+    id UUID,
+    role TEXT,
+    content TEXT,
+    created_at TIMESTAMP WITH TIME ZONE
+) LANGUAGE plpgsql AS $$
+BEGIN
+    -- First check if the chat belongs to the user
+    IF NOT EXISTS (
+        SELECT 1 FROM chats c
+        WHERE c.id = p_chat_id
+        AND c.user_id = p_user_id
+    ) THEN
+        RAISE EXCEPTION 'Chat not found or access denied';
+    END IF;
+    
+    RETURN QUERY
+    SELECT 
+        cm.id,
+        cm.role,
+        cm.content,
+        cm.created_at
+    FROM chat_messages cm
+    WHERE cm.chat_id = p_chat_id
+    ORDER BY cm.created_at ASC;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION get_user_chats TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_chats TO service_role;
+GRANT EXECUTE ON FUNCTION get_chat_messages TO authenticated;
+GRANT EXECUTE ON FUNCTION get_chat_messages TO service_role;
