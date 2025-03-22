@@ -32,6 +32,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
 import { useToast } from "@/hooks/use-toast";
 import { ElevenLabsClient } from "elevenlabs";
+import { 
+  PollyClient, 
+  SynthesizeSpeechCommand, 
+  LanguageCode, 
+  OutputFormat, 
+  TextType, 
+  Engine, 
+  VoiceId 
+} from "@aws-sdk/client-polly";
 
 const SUGGESTED_PROMPTS = [
   "I'm feeling anxious about work. Any tips?",
@@ -57,9 +66,12 @@ interface Chat {
   message_count: number;
 }
 
-type VoiceProvider = "elevenlabs" | "webspeech";
+type VoiceProvider = "elevenlabs" | "webspeech" | "awspolly";
 
 const ELEVEN_LABS_API_KEY = process.env.NEXT_PUBLIC_ELEVEN_LABS_API_KEY;
+const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
+const AWS_ACCESS_KEY_ID = process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID;
+const AWS_SECRET_ACCESS_KEY = process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY;
 
 export default function ChatComponent() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -71,6 +83,7 @@ export default function ChatComponent() {
   const [isVoiceResponseEnabled, setIsVoiceResponseEnabled] = useState(false);
   const [voiceProvider, setVoiceProvider] =
     useState<VoiceProvider>("webspeech");
+  const [pollyVoice, setPollyVoice] = useState("Joanna");
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
@@ -387,11 +400,76 @@ export default function ChatComponent() {
     speechSynthesis.speak(utterance);
   };
   
+  const speakTextPolly = async (text: string) => {
+    if (!isVoiceResponseEnabled) return;
+    
+    // Stop any currently playing audio
+    stopCurrentAudio();
+    
+    try {
+     console.log(AWS_REGION) 
+      const pollyClient = new PollyClient({
+        region: AWS_REGION,
+        credentials: {
+          accessKeyId: AWS_ACCESS_KEY_ID || "",
+          secretAccessKey: AWS_SECRET_ACCESS_KEY || ""
+        }
+      });
+      
+      // Create the Polly params object with proper typing
+      const params = {
+        Engine: "neural" as Engine,
+        OutputFormat: "mp3" as OutputFormat,
+        Text: text,
+        VoiceId: pollyVoice as VoiceId,
+        TextType: "text" as TextType,
+        LanguageCode: "en-US" as LanguageCode
+      };
+      
+      // Create the speech synthesis command
+      const command = new SynthesizeSpeechCommand(params);
+      
+      // Execute the command
+      const data = await pollyClient.send(command);
+      
+      // Convert response to audio
+      if (data.AudioStream) {
+        const uInt8Array = await data.AudioStream.transformToByteArray();
+        const blob = new Blob([uInt8Array], { type: "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
+        
+        const audio = new Audio(url);
+        currentAudioRef.current = audio;
+        
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          currentAudioRef.current = null;
+          isPlayingRef.current = false;
+        };
+        
+        isPlayingRef.current = true;
+        await audio.play();
+      }
+    } catch (error) {
+      console.error("Error with AWS Polly:", error);
+      toast({
+        title: "AWS Polly Error",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+      
+      // Fallback to Web Speech API if AWS Polly fails
+      speakTextWebSpeech(text);
+    }
+  };
+  
   const speakText = (text: string) => {
     if (!isVoiceResponseEnabled) return;
 
     if (voiceProvider === "elevenlabs") {
       speakTextElevenLabs(text);
+    } else if (voiceProvider === "awspolly") {
+      speakTextPolly(text);
     } else {
       speakTextWebSpeech(text);
     }
@@ -582,18 +660,41 @@ export default function ChatComponent() {
             </label>
           </div>
           {isVoiceResponseEnabled && (
-            <Select
-              value={voiceProvider}
-              onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select voice provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
-                <SelectItem value="elevenlabs">ElevenLabs (Limited Credit 🥲)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Select
+                value={voiceProvider}
+                onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select voice provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
+                  <SelectItem value="awspolly">AWS Polly (Premium)</SelectItem>
+                  <SelectItem value="elevenlabs">ElevenLabs (Limited Credit 🥲)</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {voiceProvider === "awspolly" && (
+                <Select
+                  value={pollyVoice}
+                  onValueChange={(value) => setPollyVoice(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select AWS Polly voice" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Joanna">Joanna (Female)</SelectItem>
+                    <SelectItem value="Matthew">Matthew (Male)</SelectItem>
+                    <SelectItem value="Salli">Salli (Female)</SelectItem>
+                    <SelectItem value="Kimberly">Kimberly (Female)</SelectItem>
+                    <SelectItem value="Kevin">Kevin (Male)</SelectItem>
+                    <SelectItem value="Amy">Amy (Female, British)</SelectItem>
+                    <SelectItem value="Brian">Brian (Male, British)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           )}
         </div>
         <span className="text-red-500 text-sm mt-2">

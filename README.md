@@ -148,6 +148,11 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 GEMINI_API_KEY=your_gemini_api_key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 FASTAPI_API_URL=your_fastapi_api_url
+
+# AWS Polly Configuration
+NEXT_PUBLIC_AWS_REGION=us-east-1
+NEXT_PUBLIC_AWS_ACCESS_KEY_ID=your_aws_access_key_id
+NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 ```
 
 ### 2. Google Gemini AI Setup
@@ -171,7 +176,29 @@ npm install
 npm run dev
 ```
 
-### 4. ML Service Setup (AWS EC2)
+### 4. AWS Polly Setup (Text-to-Speech)
+
+1. Create an AWS account if you don't have one
+2. Create an IAM user with programmatic access and the `AmazonPollyFullAccess` policy
+3. Get your AWS Access Key ID and Secret Access Key
+4. Set environment variables in `.env.local`:
+
+```bash
+# Client-side AWS Polly configuration
+NEXT_PUBLIC_AWS_REGION=us-east-1
+NEXT_PUBLIC_AWS_ACCESS_KEY_ID=your_aws_access_key_id
+NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+```
+
+5. Install the AWS Polly client:
+
+```bash
+npm install @aws-sdk/client-polly
+```
+
+6. AWS Polly provides high-quality neural text-to-speech directly in the browser for a responsive voice experience.
+
+### 5. ML Service Setup (AWS EC2)
 
 ```bash
 
