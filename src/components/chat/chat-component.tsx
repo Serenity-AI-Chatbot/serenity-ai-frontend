@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
+import { AwsTranscribeInput } from "@/components/journal/aws-transcribe-input";
 import { useToast } from "@/hooks/use-toast";
 import { ElevenLabsClient } from "elevenlabs";
 import { 
@@ -67,6 +68,7 @@ interface Chat {
 }
 
 type VoiceProvider = "elevenlabs" | "webspeech" | "awspolly";
+type VoiceRecognitionProvider = "webspeech" | "awstranscribe";
 
 const ELEVEN_LABS_API_KEY = process.env.NEXT_PUBLIC_ELEVEN_LABS_API_KEY;
 const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
@@ -83,6 +85,7 @@ export default function ChatComponent() {
   const [isVoiceResponseEnabled, setIsVoiceResponseEnabled] = useState(false);
   const [voiceProvider, setVoiceProvider] =
     useState<VoiceProvider>("webspeech");
+  const [voiceRecognitionProvider, setVoiceRecognitionProvider] = useState<VoiceRecognitionProvider>("webspeech");
   const [pollyVoice, setPollyVoice] = useState("Joanna");
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -623,10 +626,17 @@ export default function ChatComponent() {
                   Speak to add text to your message
                 </DialogDescription>
               </DialogHeader>
-              <AIVoiceInput
-                onStart={() => setVoiceText("")}
-                onStop={handleVoiceInput}
-              />
+              {voiceRecognitionProvider === "webspeech" ? (
+                <AIVoiceInput
+                  onStart={() => setVoiceText("")}
+                  onStop={handleVoiceInput}
+                />
+              ) : (
+                <AwsTranscribeInput
+                  onStart={() => setVoiceText("")}
+                  onStop={handleVoiceInput}
+                />
+              )}
               <p className="mt-4 text-center text-sm text-gray-500">
                 {voiceText || "Speak now..."}
               </p>
@@ -696,6 +706,24 @@ export default function ChatComponent() {
               )}
             </div>
           )}
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-900 dark:text-emerald-500">
+              🎤 Voice Recognition Provider
+            </label>
+            <Select
+              value={voiceRecognitionProvider}
+              onValueChange={(value: VoiceRecognitionProvider) => setVoiceRecognitionProvider(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select voice recognition provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="webspeech">Web Speech API (Browser-based)</SelectItem>
+                <SelectItem value="awstranscribe">AWS Transcribe (Premium)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <span className="text-red-500 text-sm mt-2">
           ⚠️ Voice input is supported only in the latest versions of Safari and
