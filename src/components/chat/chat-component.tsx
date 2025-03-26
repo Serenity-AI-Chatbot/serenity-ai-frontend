@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mic, Plus } from "lucide-react";
+import { Loader2, Mic, Plus, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -498,6 +498,20 @@ export default function ChatComponent() {
             Chat with Serenity-AI
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (currentChatId) {
+                  window.location.href = `/chat/zen/${currentChatId}`;
+                }
+              }}
+              disabled={!currentChatId}
+              className="text-white hover:bg-emerald-600"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Zen Mode
+            </Button>
             <Button
               variant="ghost"
               size="sm"
