@@ -50,9 +50,9 @@ export default function ZenChat({ chatId }: { chatId: string }) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("webspeech");
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("awspolly");
   const [pollyVoice, setPollyVoice] = useState("Joanna");
-  const [voiceRecognitionProvider, setVoiceRecognitionProvider] = useState<VoiceRecognitionProvider>("webspeech");
+  const [voiceRecognitionProvider, setVoiceRecognitionProvider] = useState<VoiceRecognitionProvider>("awstranscribe");
   const router = useRouter();
   const recognition = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -128,7 +128,7 @@ export default function ZenChat({ chatId }: { chatId: string }) {
     setTranscript("");
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat/mock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -405,8 +405,8 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       </nav>
 
       {/* Main Chat Area */}
-      <main className="max-w-4xl mx-auto px-4 pt-20 pb-32">
-        <div className="space-y-6">
+      <main className="max-w-4xl mx-auto px-4 pt-20 pb-40">
+        <div className="space-y-6 mb-20">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -441,8 +441,8 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       </main>
 
       {/* Voice Input Area */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 shadow-lg">
+        <div className="max-w-4xl mx-auto px-4 py-6">
           {voiceRecognitionProvider === "awstranscribe" ? (
             <AwsTranscribeInput
               onStart={() => setIsProcessing(true)}
