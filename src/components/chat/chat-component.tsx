@@ -20,13 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mic, Plus } from "lucide-react";
+import { Loader2, Mic, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
@@ -90,6 +91,8 @@ export default function ChatComponent() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const speechSynthesis =
     typeof window !== "undefined" ? window.speechSynthesis : null;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -310,6 +313,43 @@ export default function ChatComponent() {
     setCurrentChatId(chatId);
   };
 
+  const deleteChat = async () => {
+    if (!currentChatId) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/chat/${currentChatId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Remove the chat from the list
+      setChats(chats.filter(chat => chat.id !== currentChatId));
+      
+      // Clear current chat
+      setMessages([]);
+      setCurrentChatId(null);
+      
+      toast({
+        title: "Success",
+        description: "Chat deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete chat",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const handleVoiceInput = (text: string) => {
     setVoiceText(text);
     setInput((prevInput) => prevInput + (prevInput ? " " : "") + text);
@@ -501,11 +541,35 @@ export default function ChatComponent() {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => {
+                if (currentChatId) {
+                  window.location.href = `/chat/zen/${currentChatId}`;
+                }
+              }}
+              disabled={!currentChatId}
+              className="text-white hover:bg-emerald-600"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Zen Mode
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleNewChat}
               className="text-white hover:bg-emerald-600"
             >
               <Plus className="h-4 w-4 mr-1" />
               New Chat
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={!currentChatId}
+              className="text-white hover:bg-emerald-600"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete Chat
             </Button>
           </div>
         </div>
@@ -737,6 +801,41 @@ export default function ChatComponent() {
           Clear Chat
         </Button>
       </div>
+      
+      {/* Delete Chat Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Chat</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this chat? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={deleteChat}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
