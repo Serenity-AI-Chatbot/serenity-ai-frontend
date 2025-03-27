@@ -27,8 +27,6 @@ export function AwsTranscribeInput({
   const [isRecording, setIsRecording] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [audioLevel, setAudioLevel] = useState(0); // Track audio level for visualization
-  const [noSpeechTimeout, setNoSpeechTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [lastAudioLevel, setLastAudioLevel] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -82,25 +80,6 @@ export function AwsTranscribeInput({
     
     return result;
   };
-
-  // Helper function to check for silence
-  const checkForSilence = useCallback(() => {
-    if (lastAudioLevel < 0.05) { // Very low audio level threshold
-      if (transcript.trim() === "") {
-        console.log("No speech detected, stopping recording");
-        stopRecording();
-        toast({
-          title: "No speech detected",
-          description: "Please try speaking again.",
-          variant: "destructive",
-        });
-      } else {
-        console.log("Has transcript but silence detected, stopping recording");
-        stopRecording();
-        if (onStop) onStop(transcript);
-      }
-    }
-  }, [lastAudioLevel, transcript, onStop]);
 
   // Start real-time transcription using a direct audio feed
   const startRecording = async () => {
@@ -200,15 +179,7 @@ export function AwsTranscribeInput({
         const rms = Math.sqrt(sumSquared / processedChunk.length);
         
         // Update audio level meter for visualization
-        const currentAudioLevel = Math.min(rms * 5, 1);
-        setAudioLevel(currentAudioLevel);
-        setLastAudioLevel(currentAudioLevel);
-        
-        // Reset or start silence detection timeout
-        if (noSpeechTimeout) {
-          clearTimeout(noSpeechTimeout);
-        }
-        setNoSpeechTimeout(setTimeout(checkForSilence, 2000)); // Check for silence after 2 seconds
+        setAudioLevel(Math.min(rms * 5, 1)); // Scale for better visual feedback
         
         // Apply strong gain - AWS Transcribe needs loud, clear audio
         // Always boost audio significantly to ensure detection
@@ -391,7 +362,6 @@ export function AwsTranscribeInput({
         (async () => {
           let finalTranscript = "";
           let noResultCounter = 0;
-          let hasSpokenContent = false;
           
           try {
             console.log("Starting to process transcription stream");
@@ -411,7 +381,6 @@ export function AwsTranscribeInput({
                     if (!result.IsPartial) {
                       finalTranscript += text + " ";
                       setTranscript(finalTranscript.trim());
-                      hasSpokenContent = true;
                     } else {
                       setTranscript(text);
                     }
@@ -429,25 +398,25 @@ export function AwsTranscribeInput({
             
             // Handle end of transcription
             if (!isRecording) {
-              if (hasSpokenContent && finalTranscript.trim()) {
+              if (finalTranscript.trim()) {
                 console.log("Final transcript:", finalTranscript.trim());
                 if (onStop) onStop(finalTranscript.trim());
               } else {
-                console.log("No valid transcription results");
+                console.log("No transcription results");
                 toast({
                   title: "No speech detected",
                   description: "Try speaking louder or check your microphone.",
                   variant: "destructive",
                 });
+                if (onStop) onStop("No speech detected");
               }
             }
           } catch (error) {
             console.error("Error processing transcription stream:", error);
             
-            // If we have final transcript and spoken content, still use it
-            if (hasSpokenContent && finalTranscript) {
+            // If we have final transcript, still use it
+            if (finalTranscript) {
               console.log("Using existing transcript despite error");
-              if (onStop) onStop(finalTranscript.trim());
             }
           }
         })();
@@ -479,12 +448,6 @@ export function AwsTranscribeInput({
   // Clean up all resources
   const cleanupResources = () => {
     console.log("Cleaning up resources");
-    
-    // Clear the no speech timeout
-    if (noSpeechTimeout) {
-      clearTimeout(noSpeechTimeout);
-      setNoSpeechTimeout(null);
-    }
     
     // Disconnect and clean up audio nodes
     if (processorRef.current) {
@@ -543,21 +506,17 @@ export function AwsTranscribeInput({
     setIsRecording(false);
     setStatusMessage("Processing final results...");
     
-    // Clear the no speech timeout if it exists
-    if (noSpeechTimeout) {
-      clearTimeout(noSpeechTimeout);
-      setNoSpeechTimeout(null);
-    }
-    
-    // Immediate cleanup after a short delay to allow final processing
+    // Ensure we give enough time for the audioGenerator to detect recording has stopped
+    // and for final results to come through
     setTimeout(() => {
       console.log("Cleanup delay complete");
+      // Only clean up resources if we're still not recording (prevent race conditions)
       if (!isRecording) {
         setSubmitted(false);
         setStatusMessage("");
         cleanupResources();
       }
-    }, 1000); // Reduced from 5000ms to 1000ms
+    }, 5000); // Wait 5 seconds to ensure all processing completes
   };
 
   const handleClick = useCallback(() => {
