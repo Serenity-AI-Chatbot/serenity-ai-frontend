@@ -6,6 +6,7 @@ interface PageProps {
   };
 }
 
-export default function ZenModePage({ params }: PageProps) {
-  return <ZenChat chatId={params.chatId} />;
+export default async function ZenModePage({ params }: PageProps) {
+  const { chatId } = await params;
+  return <ZenChat chatId={chatId} />;
 } 

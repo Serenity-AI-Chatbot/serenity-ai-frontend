@@ -49,6 +49,7 @@ export default function ZenChat({ chatId }: { chatId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("awspolly");
   const [pollyVoice, setPollyVoice] = useState("Joanna");
@@ -56,6 +57,8 @@ export default function ZenChat({ chatId }: { chatId: string }) {
   const router = useRouter();
   const recognition = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isSubmittingRef = useRef(false);
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
 
   useEffect(() => {
     // Initialize speech recognition
@@ -93,6 +96,14 @@ export default function ZenChat({ chatId }: { chatId: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    // Add effect to stop WebSpeech recognition when AI is generating
+    if (isAiGenerating && recognition.current && isListening) {
+      recognition.current.stop();
+      setIsListening(false);
+    }
+  }, [isAiGenerating, isListening]);
+
   const fetchChatMessages = async () => {
     try {
       const response = await fetch(`/api/chat/${chatId}`);
@@ -120,15 +131,20 @@ export default function ZenChat({ chatId }: { chatId: string }) {
   };
 
   const handleSubmit = async (text: string) => {
-    if (!text.trim() || isProcessing) return;
+    if (!text.trim() || isProcessing || isSubmittingRef.current) return;
 
+    // Set the ref to prevent duplicate submissions
+    isSubmittingRef.current = true;
+    
     setIsProcessing(true);
+    setIsAiGenerating(true);
+    
     const userMessage: Message = { role: "user" as const, content: text };
     setMessages(prev => [...prev, userMessage]);
     setTranscript("");
 
     try {
-      const response = await fetch("/api/chat/mock", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,7 +187,7 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       }
 
       // Speak the response
-      speakText(assistantMessage);
+      await speakText(assistantMessage);
 
     } catch (error) {
       console.error("Error:", error);
@@ -181,11 +197,16 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       ]);
     } finally {
       setIsProcessing(false);
+      setIsAiGenerating(false);
+      isSubmittingRef.current = false;
     }
   };
 
   const speakTextElevenLabs = async (text: string) => {
     try {
+      setIsAiGenerating(true);
+      setIsVoiceSpeaking(true);
+      
       const client = new ElevenLabsClient({
         apiKey: ELEVEN_LABS_API_KEY,
       });
@@ -210,17 +231,23 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       audioElement.onended = () => {
         URL.revokeObjectURL(audioUrl);
         currentAudioRef.current = null;
+        setIsAiGenerating(false);
+        setIsVoiceSpeaking(false);
       };
 
       await audioElement.play();
     } catch (error) {
       console.error("Error generating speech:", error);
+      setIsAiGenerating(false);
+      setIsVoiceSpeaking(false);
     }
   };
 
   const speakTextWebSpeech = (text: string) => {
     if (!window.speechSynthesis) return;
 
+    setIsAiGenerating(true);
+    setIsVoiceSpeaking(true);
     stopCurrentAudio();
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -242,11 +269,24 @@ export default function ZenChat({ chatId }: { chatId: string }) {
 
     if (voice) utterance.voice = voice;
 
+    utterance.onend = () => {
+      setIsAiGenerating(false);
+      setIsVoiceSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      setIsAiGenerating(false);
+      setIsVoiceSpeaking(false);
+    };
+
     window.speechSynthesis.speak(utterance);
   };
 
   const speakTextPolly = async (text: string) => {
     try {
+      setIsAiGenerating(true);
+      setIsVoiceSpeaking(true);
+      
       const pollyClient = new PollyClient({
         region: AWS_REGION,
         credentials: {
@@ -278,12 +318,16 @@ export default function ZenChat({ chatId }: { chatId: string }) {
         audio.onended = () => {
           URL.revokeObjectURL(url);
           currentAudioRef.current = null;
+          setIsAiGenerating(false);
+          setIsVoiceSpeaking(false);
         };
         
         await audio.play();
       }
     } catch (error) {
       console.error("Error with AWS Polly:", error);
+      setIsAiGenerating(false);
+      setIsVoiceSpeaking(false);
       // Fallback to Web Speech API
       speakTextWebSpeech(text);
     }
@@ -299,23 +343,50 @@ export default function ZenChat({ chatId }: { chatId: string }) {
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    setIsAiGenerating(false);
+    setIsVoiceSpeaking(false);
   };
 
-  const speakText = (text: string) => {
+  const speakText = async (text: string) => {
+    setIsAiGenerating(true);
+    
     if (voiceProvider === "elevenlabs") {
-      speakTextElevenLabs(text);
+      await speakTextElevenLabs(text);
     } else if (voiceProvider === "awspolly") {
-      speakTextPolly(text);
+      await speakTextPolly(text);
     } else {
       speakTextWebSpeech(text);
     }
   };
 
   const handleVoiceInput = (text: string) => {
-    if (text.trim()) {
-      handleSubmit(text);
+    if (!text || !text.trim()) return;
+    
+    // Prevent submission if already submitting or if AI is generating
+    if (isSubmittingRef.current || isAiGenerating) {
+      console.log("Ignoring voice input - already submitting or AI is generating");
+      return;
     }
+
+    console.log("Submitting voice input:", text.trim());
+    handleSubmit(text);
   };
+
+  // Explicitly prevent duplicate submissions during transitions
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clean up any active audio and recognition when navigating away
+      stopCurrentAudio();
+      if (recognition.current) {
+        recognition.current.stop();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -414,8 +485,17 @@ export default function ZenChat({ chatId }: { chatId: string }) {
                 message.role === "user"
                   ? "ml-auto bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20"
                   : "mr-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+              } ${
+                message.role === "assistant" && index === messages.length - 1 && isVoiceSpeaking
+                  ? "border-amber-400 dark:border-amber-400 shadow-amber-200 dark:shadow-amber-900/20"
+                  : ""
               }`}
             >
+              {message.role === "assistant" && index === messages.length - 1 && isVoiceSpeaking && (
+                <div className="absolute -top-2 -left-2 px-2 py-1 bg-amber-400 text-white text-xs rounded-full">
+                  Speaking
+                </div>
+              )}
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 className={`prose max-w-none ${
@@ -443,13 +523,32 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       {/* Voice Input Area */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-6">
+          {isAiGenerating && (
+            <div className="absolute top-0 left-0 right-0 -mt-10 flex items-center justify-center">
+              <div className={`px-4 py-2 rounded-t-lg text-sm font-medium ${
+                isVoiceSpeaking 
+                  ? "bg-amber-500 text-white" 
+                  : "bg-blue-500 text-white"
+              }`}>
+                {isVoiceSpeaking ? "AI is speaking..." : "AI is processing..."}
+              </div>
+            </div>
+          )}
+          
           {voiceRecognitionProvider === "awstranscribe" ? (
             <AwsTranscribeZenInput
-              onStart={() => setIsProcessing(true)}
+              onStart={() => {
+                if (isAiGenerating || isSubmittingRef.current) return;
+                setIsProcessing(true);
+              }}
               onStop={(text) => {
                 setIsProcessing(false);
-                handleVoiceInput(text);
+                if (text && text.trim()) {
+                  console.log("AWS Transcribe finished with text:", text);
+                  handleVoiceInput(text);
+                }
               }}
+              isAiGenerating={isAiGenerating || isSubmittingRef.current}
               className="bg-transparent"
             />
           ) : (
@@ -466,11 +565,12 @@ export default function ZenChat({ chatId }: { chatId: string }) {
               <Button
                 size="lg"
                 onClick={toggleListening}
+                disabled={isAiGenerating}
                 className={`px-6 rounded-xl transition-all duration-200 ${
                   isListening
                     ? "bg-red-500 hover:bg-red-600 text-white"
                     : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                }`}
+                } ${isAiGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {isListening ? "Stop Listening" : "Start Listening"}
               </Button>
