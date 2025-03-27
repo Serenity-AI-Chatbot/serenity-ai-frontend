@@ -763,11 +763,11 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
                 }
               } else {
                 console.log("No transcription results")
-                toast({
-                  title: "No speech detected",
-                  description: "Try speaking louder or check your microphone.",
-                  variant: "destructive",
-                })
+                // toast({
+                //   title: "No speech detected",
+                //   description: "Try speaking louder or check your microphone.",
+                //   variant: "destructive",
+                // })
                 if (onStop && !isShuttingDownRef.current) {
                   onStop("No speech detected")
                   // Mark as shutting down
