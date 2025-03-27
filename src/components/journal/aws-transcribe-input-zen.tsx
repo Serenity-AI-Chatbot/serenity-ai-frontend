@@ -1,85 +1,86 @@
-import { Mic } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { cn } from "@/lib/utils";
-import { 
+"use client"
+
+import { Mic } from "lucide-react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { cn } from "@/lib/utils"
+import {
   TranscribeStreamingClient,
   StartStreamTranscriptionCommand,
-  StartStreamTranscriptionCommandInput
-} from "@aws-sdk/client-transcribe-streaming";
-import { useToast } from "@/hooks/use-toast";
+  type StartStreamTranscriptionCommandInput,
+} from "@aws-sdk/client-transcribe-streaming"
+import { useToast } from "@/hooks/use-toast"
 
 interface AwsTranscribeInputProps {
-  onStart?: () => void;
-  onStop?: (text: string) => void;
-  visualizerBars?: number;
-  className?: string;
+  onStart?: () => void
+  onStop?: (text: string) => void
+  visualizerBars?: number
+  className?: string
 }
 
-export function AwsTranscribeZenInput({
-  onStart,
-  onStop,
-  visualizerBars = 48,
-  className,
-}: AwsTranscribeInputProps) {
-  const [submitted, setSubmitted] = useState(false);
-  const [time, setTime] = useState(0);
-  const [transcript, setTranscript] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [audioLevel, setAudioLevel] = useState(0); // Track audio level for visualization
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const transcribeClientRef = useRef<TranscribeStreamingClient | null>(null);
-  const audioChunksRef = useRef<Float32Array[]>([]);
-  const { toast } = useToast();
+export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, className }: AwsTranscribeInputProps) {
+  const [submitted, setSubmitted] = useState(false)
+  const [time, setTime] = useState(0)
+  const [transcript, setTranscript] = useState("")
+  const [isRecording, setIsRecording] = useState(false)
+  const [statusMessage, setStatusMessage] = useState("")
+  const [audioLevel, setAudioLevel] = useState(0) // Track audio level for visualization
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
+  const transcribeClientRef = useRef<TranscribeStreamingClient | null>(null)
+  const audioChunksRef = useRef<Float32Array[]>([])
+  const { toast } = useToast()
 
-  const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
-  const AWS_ACCESS_KEY_ID = process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID;
-  const AWS_SECRET_ACCESS_KEY = process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY;
+  const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1"
+  const AWS_ACCESS_KEY_ID = process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID
+  const AWS_SECRET_ACCESS_KEY = process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY
 
   // Helper function to convert Float32Array to Int16Array for AWS Transcribe
   const convertFloat32ToInt16 = (buffer: Float32Array) => {
-    const l = buffer.length;
-    const buf = new Int16Array(l);
-    
+    const l = buffer.length
+    const buf = new Int16Array(l)
+
     // Scale to near max level to ensure AWS can hear the audio
     for (let i = 0; i < l; i++) {
       // Scale to 16-bit range: -32768 to 32767, with stronger volume
-      const s = Math.max(-0.99, Math.min(0.99, buffer[i]));
+      const s = Math.max(-0.99, Math.min(0.99, buffer[i]))
       // Use full 16-bit range for better sensitivity
-      buf[i] = Math.round(s * 32767);
+      buf[i] = Math.round(s * 32767)
     }
-    
-    return buf;
-  };
-  
+
+    return buf
+  }
+
   // Helper to resample audio if needed
-  const resampleAudio = (audioData: Float32Array, originalSampleRate: number, targetSampleRate: number): Float32Array => {
+  const resampleAudio = (
+    audioData: Float32Array,
+    originalSampleRate: number,
+    targetSampleRate: number,
+  ): Float32Array => {
     if (originalSampleRate === targetSampleRate) {
-      return audioData;
+      return audioData
     }
-    
-    const ratio = targetSampleRate / originalSampleRate;
-    const newLength = Math.round(audioData.length * ratio);
-    const result = new Float32Array(newLength);
-    
+
+    const ratio = targetSampleRate / originalSampleRate
+    const newLength = Math.round(audioData.length * ratio)
+    const result = new Float32Array(newLength)
+
     for (let i = 0; i < newLength; i++) {
-      const position = i / ratio;
-      const index = Math.floor(position);
-      const fraction = position - index;
-      
+      const position = i / ratio
+      const index = Math.floor(position)
+      const fraction = position - index
+
       if (index >= audioData.length - 1) {
-        result[i] = audioData[audioData.length - 1];
+        result[i] = audioData[audioData.length - 1]
       } else {
         // Linear interpolation
-        result[i] = audioData[index] * (1 - fraction) + audioData[index + 1] * fraction;
+        result[i] = audioData[index] * (1 - fraction) + audioData[index + 1] * fraction
       }
     }
-    
-    return result;
-  };
+
+    return result
+  }
 
   // Start real-time transcription using a direct audio feed
   const startRecording = async () => {
@@ -88,250 +89,259 @@ export function AwsTranscribeZenInput({
         title: "Error",
         description: "AWS credentials are not set.",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
     try {
-      setStatusMessage("Getting microphone access...");
-      
+      setStatusMessage("Getting microphone access...")
+
       // First set recording state so it's available to the generator
-      setIsRecording(true);
-      setSubmitted(true);
-      
+      setIsRecording(true)
+      setSubmitted(true)
+
       // Wait a moment for state to stabilize
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Initialize audio context 
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      // Initialize audio context
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+
       // Request user media
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ 
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
-          channelCount: 1, 
+          channelCount: 1,
           sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
+          autoGainControl: true,
+        },
+      })
+
       // Create source node from the microphone stream
-      sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current);
-      
+      sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current)
+
       // Create a ScriptProcessorNode for processing audio data
       // Note: ScriptProcessorNode is deprecated but still widely supported
       // In a production app, AudioWorkletNode would be better but needs more setup
-      const bufferSize = 2048; // Smaller buffer size
-      processorRef.current = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
-      
+      const bufferSize = 2048 // Smaller buffer size
+      processorRef.current = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1)
+
       // Get actual sample rate - browser might not honor our requested rate
-      const actualSampleRate = audioContextRef.current.sampleRate;
-      console.log(`Actual sample rate from AudioContext: ${actualSampleRate}Hz`);
-      
+      const actualSampleRate = audioContextRef.current.sampleRate
+      console.log(`Actual sample rate from AudioContext: ${actualSampleRate}Hz`)
+
       // Flag to determine if we need to resample
-      const needsResampling = Math.abs(actualSampleRate - 16000) > 100;
-      console.log(`Resampling needed: ${needsResampling}`);
-      
+      const needsResampling = Math.abs(actualSampleRate - 16000) > 100
+      console.log(`Resampling needed: ${needsResampling}`)
+
       // Connect the nodes
-      sourceNodeRef.current.connect(processorRef.current);
-      processorRef.current.connect(audioContextRef.current.destination);
-      
+      sourceNodeRef.current.connect(processorRef.current)
+      processorRef.current.connect(audioContextRef.current.destination)
+
       // Reset state
-      audioChunksRef.current = [];
-      setTranscript("");
-      setStatusMessage("Recording and transcribing...");
-      if (onStart) onStart();
-      
+      audioChunksRef.current = []
+      setTranscript("")
+      setStatusMessage("Recording and transcribing...")
+      if (onStart) onStart()
+
       // Create the transcribe client
       transcribeClientRef.current = new TranscribeStreamingClient({
         region: AWS_REGION,
         credentials: {
           accessKeyId: AWS_ACCESS_KEY_ID,
-          secretAccessKey: AWS_SECRET_ACCESS_KEY
-        }
-      });
-      
+          secretAccessKey: AWS_SECRET_ACCESS_KEY,
+        },
+      })
+
       // Collect audio data via ScriptProcessorNode
       processorRef.current.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        
+        const inputData = e.inputBuffer.getChannelData(0)
+
         // Make a copy of the audio data
-        const audioChunk = new Float32Array(inputData.length);
-        audioChunk.set(inputData);
-        
+        const audioChunk = new Float32Array(inputData.length)
+        audioChunk.set(inputData)
+
         // Resample if needed to match AWS Transcribe's expected 16kHz
-        const processedChunk = needsResampling 
-          ? resampleAudio(audioChunk, actualSampleRate, 16000)
-          : audioChunk;
-        
+        const processedChunk = needsResampling ? resampleAudio(audioChunk, actualSampleRate, 16000) : audioChunk
+
         // Normalize and boost audio - improves speech recognition
-        let maxSample = 0;
-        let sumSquared = 0;
-        
+        let maxSample = 0
+        let sumSquared = 0
+
         for (let i = 0; i < processedChunk.length; i++) {
-          const sample = Math.abs(processedChunk[i]);
-          maxSample = Math.max(maxSample, sample);
-          sumSquared += processedChunk[i] * processedChunk[i];
+          const sample = Math.abs(processedChunk[i])
+          maxSample = Math.max(maxSample, sample)
+          sumSquared += processedChunk[i] * processedChunk[i]
         }
-        
+
         // Calculate RMS amplitude
-        const rms = Math.sqrt(sumSquared / processedChunk.length);
-        
+        const rms = Math.sqrt(sumSquared / processedChunk.length)
+
         // Update audio level meter for visualization
-        setAudioLevel(Math.min(rms * 5, 1)); // Scale for better visual feedback
-        
+        setAudioLevel(Math.min(rms * 5, 1)) // Scale for better visual feedback
+
+        // Silence detection for auto-submission
+        const silenceThreshold = 0.05
+        let lastAudioTime = Date.now()
+        if (rms > silenceThreshold) {
+          lastAudioTime = Date.now()
+        } else if (Date.now() - lastAudioTime > 2000 && transcript.trim().length > 0) {
+          // If silence for 2 seconds and we have transcript, auto-submit
+          console.log("Auto-submitting after silence detection")
+          stopRecording()
+          if (onStop) onStop(transcript)
+        }
+
         // Apply strong gain - AWS Transcribe needs loud, clear audio
         // Always boost audio significantly to ensure detection
-        const targetRMS = 0.3;  // Higher target RMS level for better detection
-        const gain = Math.min(Math.max(targetRMS / Math.max(rms, 0.01), 2.0), 10.0);  // Min gain 2x, Max gain 10x
-        
+        const targetRMS = 0.3 // Higher target RMS level for better detection
+        const gain = Math.min(Math.max(targetRMS / Math.max(rms, 0.01), 2.0), 10.0) // Min gain 2x, Max gain 10x
+
         // Apply gain to all samples
         for (let i = 0; i < processedChunk.length; i++) {
-          processedChunk[i] *= gain;
-          
+          processedChunk[i] *= gain
+
           // Apply soft clipping to prevent harsh distortion
           if (processedChunk[i] > 0.9) {
-            processedChunk[i] = 0.9 + 0.1 * Math.tanh((processedChunk[i] - 0.9) * 10);
+            processedChunk[i] = 0.9 + 0.1 * Math.tanh((processedChunk[i] - 0.9) * 10)
           } else if (processedChunk[i] < -0.9) {
-            processedChunk[i] = -0.9 - 0.1 * Math.tanh((-processedChunk[i] - 0.9) * 10);
+            processedChunk[i] = -0.9 - 0.1 * Math.tanh((-processedChunk[i] - 0.9) * 10)
           }
         }
-        
-        console.log(`Boosted audio by ${gain.toFixed(2)}x (RMS: ${rms.toFixed(4)}, Peak: ${maxSample.toFixed(4)})`);
-        
+
+        console.log(`Boosted audio by ${gain.toFixed(2)}x (RMS: ${rms.toFixed(4)}, Peak: ${maxSample.toFixed(4)})`)
+
         // Store processed chunk for streaming
-        audioChunksRef.current.push(processedChunk);
-      };
-      
+        audioChunksRef.current.push(processedChunk)
+      }
+
       // Create audio stream generator
       async function* audioGenerator() {
-        const chunkSize = 1024; // Smaller chunks for better streaming
-        let chunkCounter = 0;
-        let lastLogTime = Date.now();
-        let lastChunkTime = Date.now();
-        
+        const chunkSize = 1024 // Smaller chunks for better streaming
+        let chunkCounter = 0
+        let lastLogTime = Date.now()
+        let lastChunkTime = Date.now()
+
         // Track recording state locally
-        const startTime = Date.now();
-        const shouldRunUntil = startTime + 18000; // Run for at least 18 seconds
-        let isActive = true;
-        
+        const startTime = Date.now()
+        const shouldRunUntil = startTime + 18000 // Run for at least 18 seconds
+        let isActive = true
+
         try {
           // Make a local copy of the recording state variable
           // This will make the generator independent of React state updates
-          console.log("Starting audio generator, will run for at least 18 seconds");
-          
+          console.log("Starting audio generator, will run for at least 18 seconds")
+
           // Check recording state periodically but don't rely on it exclusively
           const checkRecordingInterval = setInterval(() => {
             // Only stop from external state after minimum time period
             if (!isRecording && Date.now() > shouldRunUntil) {
-              isActive = false;
-              console.log("Generator detected recording intentionally stopped");
+              isActive = false
+              console.log("Generator detected recording intentionally stopped")
             }
-          }, 100);
-          
+          }, 100)
+
           while (isActive || Date.now() < shouldRunUntil) {
             // Ensure we run for at least the minimum time regardless of state
             if (Date.now() < shouldRunUntil && !isActive) {
-              console.log("Continuing to run generator despite state change");
-              isActive = true;
+              console.log("Continuing to run generator despite state change")
+              isActive = true
             }
-            
+
             // Wait for audio data to be processed
-            await new Promise(resolve => setTimeout(resolve, 50));
-            
+            await new Promise((resolve) => setTimeout(resolve, 50))
+
             // Check if we have new audio chunks
             if (audioChunksRef.current.length > 0) {
-              lastChunkTime = Date.now();
+              lastChunkTime = Date.now()
               // Process all available chunks
               while (audioChunksRef.current.length > 0) {
-                const nextChunk = audioChunksRef.current.shift()!;
-                const int16Data = convertFloat32ToInt16(nextChunk);
-                
+                const nextChunk = audioChunksRef.current.shift()!
+                const int16Data = convertFloat32ToInt16(nextChunk)
+
                 // Send in small chunks to avoid overwhelming AWS
                 for (let offset = 0; offset < int16Data.length; offset += chunkSize) {
-                  const end = Math.min(offset + chunkSize, int16Data.length);
-                  const chunk = int16Data.slice(offset, end);
-                  
+                  const end = Math.min(offset + chunkSize, int16Data.length)
+                  const chunk = int16Data.slice(offset, end)
+
                   // Log periodically to avoid console spam
-                  chunkCounter++;
+                  chunkCounter++
                   if (chunkCounter % 10 === 0 || Date.now() - lastLogTime > 1000) {
-                    console.log(`Sending audio chunk ${chunkCounter}: ${chunk.length} samples`);
-                    lastLogTime = Date.now();
+                    console.log(`Sending audio chunk ${chunkCounter}: ${chunk.length} samples`)
+                    lastLogTime = Date.now()
                   }
-                  
+
                   // Yield the chunk
                   yield {
                     AudioEvent: {
-                      AudioChunk: new Uint8Array(chunk.buffer)
-                    }
-                  };
-                  
+                      AudioChunk: new Uint8Array(chunk.buffer),
+                    },
+                  }
+
                   // Small delay between chunks
-                  await new Promise(resolve => setTimeout(resolve, 20));
+                  await new Promise((resolve) => setTimeout(resolve, 20))
                 }
               }
             } else if (Date.now() - lastChunkTime > 500) {
               // Send a small "keepalive" audio chunk with minimal noise to prevent
               // AWS from disconnecting due to silence
-              lastChunkTime = Date.now();
-              
+              lastChunkTime = Date.now()
+
               // Create a small silent chunk with tiny amount of noise
-              const silentChunk = new Float32Array(160); // 10ms at 16kHz
+              const silentChunk = new Float32Array(160) // 10ms at 16kHz
               for (let i = 0; i < silentChunk.length; i++) {
                 // Add a tiny bit of noise so it's not pure silence
-                silentChunk[i] = (Math.random() - 0.5) * 0.001;
+                silentChunk[i] = (Math.random() - 0.5) * 0.001
               }
-              
-              const int16Data = convertFloat32ToInt16(silentChunk);
-              
+
+              const int16Data = convertFloat32ToInt16(silentChunk)
+
               if (chunkCounter % 20 === 0) {
-                console.log("Sending keepalive audio chunk");
+                console.log("Sending keepalive audio chunk")
               }
-              
-              chunkCounter++;
-              
+
+              chunkCounter++
+
               yield {
                 AudioEvent: {
-                  AudioChunk: new Uint8Array(int16Data.buffer)
-                }
-              };
+                  AudioChunk: new Uint8Array(int16Data.buffer),
+                },
+              }
             }
           }
-          
-          console.log("Audio stream ended");
-          clearInterval(checkRecordingInterval);
-          
+
+          console.log("Audio stream ended")
+          clearInterval(checkRecordingInterval)
+
           // Send one final set of audio to ensure AWS has something to process
-          const finalSilentChunk = new Float32Array(1600);
+          const finalSilentChunk = new Float32Array(1600)
           for (let i = 0; i < finalSilentChunk.length; i++) {
             // Add a tiny bit of noise
-            finalSilentChunk[i] = (Math.random() - 0.5) * 0.0005;
+            finalSilentChunk[i] = (Math.random() - 0.5) * 0.0005
           }
-          
-          console.log("Sending final audio chunk");
+
+          console.log("Sending final audio chunk")
           yield {
             AudioEvent: {
-              AudioChunk: new Uint8Array(convertFloat32ToInt16(finalSilentChunk).buffer)
-            }
-          };
-          
+              AudioChunk: new Uint8Array(convertFloat32ToInt16(finalSilentChunk).buffer),
+            },
+          }
+
           // Give AWS time to process the audio
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
+          await new Promise((resolve) => setTimeout(resolve, 500))
         } catch (error) {
-          console.error("Audio streaming error:", error);
+          console.error("Audio streaming error:", error)
         } finally {
-          console.log("Sending empty chunk to signal end of audio");
+          console.log("Sending empty chunk to signal end of audio")
           // Final yield to signal completion
-          yield { 
-            AudioEvent: { 
-              AudioChunk: new Uint8Array(0) 
-            } 
-          };
+          yield {
+            AudioEvent: {
+              AudioChunk: new Uint8Array(0),
+            },
+          }
         }
       }
-      
+
       // Configure the transcription request
       const transcribeParams: StartStreamTranscriptionCommandInput = {
         LanguageCode: "en-US",
@@ -345,216 +355,234 @@ export function AwsTranscribeZenInput({
         VocabularyFilterMethod: undefined,
         VocabularyFilterName: undefined,
         // Critical: Set to false to get all audio processed
-        ShowSpeakerLabel: false
-      };
-      
-      console.log("Starting live transcription...");
-      
+        ShowSpeakerLabel: false,
+      }
+
+      console.log("Starting live transcription...")
+
       // Start transcription
-      const command = new StartStreamTranscriptionCommand(transcribeParams);
-      const response = await transcribeClientRef.current.send(command);
-      
-      console.log("Transcribe session established");
-      
+      const command = new StartStreamTranscriptionCommand(transcribeParams)
+      const response = await transcribeClientRef.current.send(command)
+
+      console.log("Transcribe session established")
+
       // Process transcription results
-      const stream = response.TranscriptResultStream;
+      const stream = response.TranscriptResultStream
       if (stream) {
-        (async () => {
-          let finalTranscript = "";
-          let noResultCounter = 0;
-          
+        ;(async () => {
+          let finalTranscript = ""
+          let noResultCounter = 0
+
           try {
-            console.log("Starting to process transcription stream");
+            console.log("Starting to process transcription stream")
             for await (const event of stream) {
               if (event?.TranscriptEvent?.Transcript) {
-                console.log("Received transcription event:", JSON.stringify(event, null, 2));
-                
+                console.log("Received transcription event:", JSON.stringify(event, null, 2))
+
                 for (const result of event.TranscriptEvent.Transcript.Results || []) {
-                  if (result?.Alternatives && 
-                      result.Alternatives.length > 0 && 
-                      result.Alternatives[0].Transcript) {
-                    
-                    const text = result.Alternatives[0].Transcript;
-                    console.log(`Received text: "${text}", IsPartial: ${result.IsPartial}`);
-                    
+                  if (result?.Alternatives && result.Alternatives.length > 0 && result.Alternatives[0].Transcript) {
+                    const text = result.Alternatives[0].Transcript
+                    console.log(`Received text: "${text}", IsPartial: ${result.IsPartial}`)
+
                     // Handle partial vs final results
                     if (!result.IsPartial) {
-                      finalTranscript += text + " ";
-                      setTranscript(finalTranscript.trim());
+                      finalTranscript += text + " "
+                      setTranscript(finalTranscript.trim())
                     } else {
-                      setTranscript(text);
+                      setTranscript(text)
                     }
                   }
                 }
               } else {
                 // Count empty events for debugging
-                noResultCounter++;
+                noResultCounter++
                 if (noResultCounter % 5 === 0) {
-                  console.log(`Received ${noResultCounter} events with no transcription`);
+                  console.log(`Received ${noResultCounter} events with no transcription`)
                 }
               }
             }
-            console.log("Transcription stream completed");
-            
+            console.log("Transcription stream completed")
+
             // Handle end of transcription
             if (!isRecording) {
               if (finalTranscript.trim()) {
-                console.log("Final transcript:", finalTranscript.trim());
-                if (onStop) onStop(finalTranscript.trim());
+                console.log("Final transcript:", finalTranscript.trim())
+                if (onStop) onStop(finalTranscript.trim())
               } else {
-                console.log("No transcription results");
+                console.log("No transcription results")
                 toast({
                   title: "No speech detected",
                   description: "Try speaking louder or check your microphone.",
                   variant: "destructive",
-                });
-                if (onStop) onStop("No speech detected");
+                })
+                if (onStop) onStop("No speech detected")
               }
             }
           } catch (error) {
-            console.error("Error processing transcription stream:", error);
-            
+            console.error("Error processing transcription stream:", error)
+
             // If we have final transcript, still use it
             if (finalTranscript) {
-              console.log("Using existing transcript despite error");
+              console.log("Using existing transcript despite error")
             }
           }
-        })();
+        })()
       }
-      
+
       // Set a maximum recording time
       setTimeout(() => {
         if (isRecording) {
-          console.log("Auto-stopping recording after timeout");
-          stopRecording();
+          console.log("Auto-stopping recording after timeout")
+          stopRecording()
         }
-      },
-      20000); // 20 seconds max
-      
+      }, 20000) // 20 seconds max
     } catch (error) {
-      console.error("Error setting up transcription:", error);
-      setStatusMessage("");
+      console.error("Error setting up transcription:", error)
+      setStatusMessage("")
       toast({
         title: "Setup Error",
         description: "Could not initialize transcription. Please try again.",
         variant: "destructive",
-      });
-      cleanupResources();
-      setSubmitted(false);
-      setIsRecording(false);
+      })
+      cleanupResources()
+      setSubmitted(false)
+      setIsRecording(false)
     }
-  };
+  }
 
   // Clean up all resources
   const cleanupResources = () => {
-    console.log("Cleaning up resources");
-    
+    console.log("Cleaning up resources")
+
+    // Set state first to prevent race conditions
+    setIsRecording(false)
+
     // Disconnect and clean up audio nodes
     if (processorRef.current) {
       try {
-        processorRef.current.disconnect();
-        processorRef.current.onaudioprocess = null;
+        processorRef.current.disconnect()
+        processorRef.current.onaudioprocess = null
       } catch (e) {
-        console.warn("Error disconnecting processor:", e);
+        console.warn("Error disconnecting processor:", e)
       }
-      processorRef.current = null;
+      processorRef.current = null
     }
-    
+
     if (sourceNodeRef.current) {
       try {
-        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current.disconnect()
       } catch (e) {
-        console.warn("Error disconnecting source:", e);
+        console.warn("Error disconnecting source:", e)
       }
-      sourceNodeRef.current = null;
+      sourceNodeRef.current = null
     }
-    
+
     // Stop all media tracks
     if (streamRef.current) {
       try {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop())
       } catch (e) {
-        console.warn("Error stopping media tracks:", e);
+        console.warn("Error stopping media tracks:", e)
       }
-      streamRef.current = null;
+      streamRef.current = null
     }
-    
+
     // Close audio context
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
       try {
-        audioContextRef.current.close();
+        audioContextRef.current.close()
       } catch (e) {
-        console.warn("Error closing audio context:", e);
+        console.warn("Error closing audio context:", e)
       }
-      audioContextRef.current = null;
+      audioContextRef.current = null
     }
-    
+
     // Destroy transcribe client
     if (transcribeClientRef.current) {
       try {
-        transcribeClientRef.current.destroy();
+        transcribeClientRef.current.destroy()
       } catch (e) {
-        console.warn("Error destroying transcribe client:", e);
+        console.warn("Error destroying transcribe client:", e)
       }
-      transcribeClientRef.current = null;
+      transcribeClientRef.current = null
     }
-  };
+
+    // Reset transcript and audio chunks
+    audioChunksRef.current = []
+    setTranscript("")
+  }
 
   // Stop recording and cleanup
   const stopRecording = () => {
-    console.log("Stopping recording");
-    setIsRecording(false);
-    setStatusMessage("Processing final results...");
-    
+    console.log("Stopping recording")
+    setIsRecording(false)
+    setStatusMessage("Processing final results...")
+
+    // Store the current transcript for submission
+    const currentTranscript = transcript
+
     // Ensure we give enough time for the audioGenerator to detect recording has stopped
     // and for final results to come through
     setTimeout(() => {
-      console.log("Cleanup delay complete");
+      console.log("Cleanup delay complete")
       // Only clean up resources if we're still not recording (prevent race conditions)
       if (!isRecording) {
-        setSubmitted(false);
-        setStatusMessage("");
-        cleanupResources();
+        setSubmitted(false)
+        setStatusMessage("")
+        cleanupResources()
+
+        // If we have transcript, call onStop with it
+        if (currentTranscript.trim() && onStop) {
+          onStop(currentTranscript.trim())
+        }
       }
-    }, 5000); // Wait 5 seconds to ensure all processing completes
-  };
+    }, 1000) // Reduced from 5000ms to 1000ms for faster response
+  }
 
   const handleClick = useCallback(() => {
     if (!submitted) {
-      startRecording();
+      // Starting a new recording
+      setTranscript("") // Clear any previous transcript
+      startRecording()
     } else {
-      stopRecording();
+      // Stopping current recording
+      stopRecording()
+
+      // Add a small delay before allowing restart
+      setTimeout(() => {
+        setSubmitted(false)
+      }, 1500)
     }
-  }, [submitted]);
+  }, [submitted, transcript])
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: NodeJS.Timeout
 
     if (submitted) {
       intervalId = setInterval(() => {
-        setTime((t) => t + 1);
-      }, 1000);
+        setTime((t) => t + 1)
+      }, 1000)
     } else {
-      setTime(0); // Reset timer when stopped
+      setTime(0) // Reset timer when stopped
     }
 
-    return () => clearInterval(intervalId);
-  }, [submitted]);
+    return () => clearInterval(intervalId)
+  }, [submitted])
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
 
   // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       if (isRecording) {
-        cleanupResources();
+        cleanupResources()
       }
-    };
-  }, [isRecording]);
+    }
+  }, [isRecording])
 
   return (
     <div className={cn("w-full py-4", className)}>
@@ -589,11 +617,11 @@ export function AwsTranscribeZenInput({
         {/* Audio level meter */}
         {submitted && (
           <div className="w-64 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-green-500 transition-all duration-100"
-              style={{ 
+              style={{
                 width: `${audioLevel * 100}%`,
-                backgroundColor: audioLevel > 0.6 ? 'green' : (audioLevel > 0.2 ? 'yellow' : 'red')
+                backgroundColor: audioLevel > 0.6 ? "green" : audioLevel > 0.2 ? "yellow" : "red",
               }}
             />
           </div>
@@ -624,9 +652,11 @@ export function AwsTranscribeZenInput({
         </p>
 
         <p className="mt-4 text-sm text-center text-black/70 dark:text-white/70 max-w-md">
-          {transcript || (submitted ? "Speak now - talk clearly and directly into the microphone" : "Click mic to start")}
+          {transcript ||
+            (submitted ? "Speak now - talk clearly and directly into the microphone" : "Click mic to start")}
         </p>
       </div>
     </div>
-  );
-} 
+  )
+}
+
