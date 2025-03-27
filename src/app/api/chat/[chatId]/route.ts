@@ -1,5 +1,4 @@
 import { requireAuth, supabase } from "@/lib/supabase-server";
-import { cache } from "@/lib/cache";
 
 export const runtime = "edge";
 
@@ -21,16 +20,6 @@ export async function GET(
   }
 
   try {
-    // Try to get from cache first
-    const cacheKey = `chat_messages_${chatId}_${userId}`;
-    const cachedData = cache.get(cacheKey);
-    
-    if (cachedData) {
-      console.log("----------Cache hit---------- [chatId]",chatId);
-      return new Response(JSON.stringify(cachedData), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     const { data, error } = await supabase.rpc('get_chat_messages', {
       p_chat_id: chatId,
@@ -44,8 +33,6 @@ export async function GET(
       throw error;
     }
 
-    // Cache the result for 5 minutes
-    cache.set(cacheKey, data);
 
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json' }
@@ -93,10 +80,6 @@ export async function DELETE(
       }
       throw error;
     }
-
-    // Clear cache for this chat
-    const cacheKey = `chat_messages_${chatId}_${userId}`;
-    cache.delete(cacheKey);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }

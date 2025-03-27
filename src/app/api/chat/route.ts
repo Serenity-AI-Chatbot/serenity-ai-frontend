@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { requireAuth, supabase } from "@/lib/supabase-server"
 import { parse, format } from 'date-fns'
-import { cache } from "@/lib/cache"
 
 // Initialize the Gemini model with proper error handling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
@@ -199,24 +198,10 @@ export async function GET(req: Request) {
   const userId = session.user.id;
   
   try {
-    // Try to get from cache first
-    const cacheKey = `user_chats_${userId}`;
-    const cachedData = cache.get(cacheKey);
-    
-    if (cachedData) {
-      console.log("----------Cache hit---------- [chats]");
-      return new Response(JSON.stringify(cachedData), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     const { data, error } = await supabase
       .rpc('get_user_chats', { p_user_id: userId });
       
     if (error) throw error;
-    
-    // Cache the result for 5 minutes
-    cache.set(cacheKey, data);
     
     return new Response(JSON.stringify(data), {
       headers: { 'Content-Type': 'application/json' }
@@ -533,17 +518,6 @@ async function streamChatResponseWithSave(model: any, geminiMessages: any[], use
           role: 'assistant',
           content: completeAssistantMessage
         });
-
-        // Invalidate the cache for this chat's messages
-        const userId = (await requireAuth()).session?.user.id;
-        if (userId) {
-          const chatMessagesCacheKey = `chat_messages_${chatId}_${userId}`;
-          cache.delete(chatMessagesCacheKey);
-          
-          // Also invalidate the user's chats list cache
-          const userChatsCacheKey = `user_chats_${userId}`;
-          cache.delete(userChatsCacheKey);
-        }
         
         controller.close()
       } catch (error) {
