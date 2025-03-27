@@ -15,9 +15,10 @@ interface AwsTranscribeInputProps {
   onStop?: (text: string) => void
   visualizerBars?: number
   className?: string
+  isAiGenerating?: boolean
 }
 
-export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, className }: AwsTranscribeInputProps) {
+export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, className, isAiGenerating = false }: AwsTranscribeInputProps) {
   const [submitted, setSubmitted] = useState(false)
   const [time, setTime] = useState(0)
   const [transcript, setTranscript] = useState("")
@@ -31,6 +32,26 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
   const transcribeClientRef = useRef<TranscribeStreamingClient | null>(null)
   const audioChunksRef = useRef<Float32Array[]>([])
   const { toast } = useToast()
+
+  const [silenceStartTime, setSilenceStartTime] = useState<number | null>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const silenceThresholdRef = useRef(0.05) // Threshold for silence detection
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const [consecutiveLowAudioFrames, setConsecutiveLowAudioFrames] = useState(0)
+  const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastTranscriptRef = useRef("")
+  // Add a new ref for the empty results timer
+  const emptyResultsTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Replace the consecutive empty results state with a timestamp state
+  const [lastEmptyResultTime, setLastEmptyResultTime] = useState<number | null>(null)
+
+  // Add a new ref to track if auto-submit is in progress
+  const autoSubmitInProgressRef = useRef(false)
+
+  // Add this to track if we're in the process of shutting down
+  const isShuttingDownRef = useRef(false)
 
   const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1"
   const AWS_ACCESS_KEY_ID = process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID
@@ -82,8 +103,102 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
     return result
   }
 
+  // Force immediate cleanup - for emergency use
+  const forceImmediateCleanup = () => {
+    console.log("FORCE IMMEDIATE CLEANUP")
+    
+    // Stop all tracks first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+    }
+    
+    // Disconnect audio nodes
+    if (processorRef.current) {
+      try {
+        processorRef.current.onaudioprocess = null
+        processorRef.current.disconnect()
+      } catch (e) {}
+    }
+    
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.disconnect()
+      } catch (e) {}
+    }
+    
+    // Destroy transcribe client
+    if (transcribeClientRef.current) {
+      try {
+        transcribeClientRef.current.destroy()
+      } catch (e) {}
+      transcribeClientRef.current = null
+    }
+    
+    // Close audio context
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close()
+      } catch (e) {}
+      audioContextRef.current = null
+    }
+    
+    // Clear all timeouts
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current)
+    if (autoSubmitTimeoutRef.current) clearTimeout(autoSubmitTimeoutRef.current)
+    if (emptyResultsTimerRef.current) clearTimeout(emptyResultsTimerRef.current)
+    
+    // Reset all refs and state
+    silenceTimeoutRef.current = null
+    autoSubmitTimeoutRef.current = null
+    emptyResultsTimerRef.current = null
+    streamRef.current = null
+    sourceNodeRef.current = null
+    processorRef.current = null
+    audioChunksRef.current = []
+    autoSubmitInProgressRef.current = false
+    isShuttingDownRef.current = false
+    
+    // Reset UI state
+    setIsRecording(false)
+    setIsSpeaking(false)
+    setSilenceStartTime(null)
+    setLastEmptyResultTime(null)
+    setConsecutiveLowAudioFrames(0)
+    setSubmitted(false)
+    setStatusMessage("")
+    setTranscript("")
+  }
+
+  // Add an emergency stop timeout in case regular methods fail
+  // This will absolutely ensure the recording stops eventually
+  const setupEmergencyTimeout = () => {
+    return setTimeout(() => {
+      if (isRecording) {
+        console.log("EMERGENCY STOP: Recording still active after max duration")
+        forceImmediateCleanup()
+      }
+    }, 15000) // 15 seconds max
+  }
+
   // Start real-time transcription using a direct audio feed
   const startRecording = async () => {
+    // First check if we're already shutting down or recording
+    if (isShuttingDownRef.current || isRecording) {
+      console.log("Cannot start recording while already recording or shutting down")
+      return
+    }
+    
+    // Don't start recording if AI is generating a response
+    if (isAiGenerating) {
+      console.log("Cannot start recording while AI is generating a response")
+      toast({
+        title: "Wait for AI",
+        description: "Please wait until the AI response finishes generating.",
+        variant: "default",
+      })
+      return
+    }
+
     if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
       toast({
         title: "Error",
@@ -99,6 +214,9 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
       // First set recording state so it's available to the generator
       setIsRecording(true)
       setSubmitted(true)
+
+      // Setup emergency timeout
+      const emergencyTimeoutId = setupEmergencyTimeout()
 
       // Wait a moment for state to stabilize
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -144,6 +262,13 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
       setStatusMessage("Recording and transcribing...")
       if (onStart) onStart()
 
+      // In the startRecording function, add this line after other state resets
+      setLastEmptyResultTime(null)
+      if (emptyResultsTimerRef.current) {
+        clearTimeout(emptyResultsTimerRef.current)
+        emptyResultsTimerRef.current = null
+      }
+
       // Create the transcribe client
       transcribeClientRef.current = new TranscribeStreamingClient({
         region: AWS_REGION,
@@ -180,16 +305,114 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
         // Update audio level meter for visualization
         setAudioLevel(Math.min(rms * 5, 1)) // Scale for better visual feedback
 
-        // Silence detection for auto-submission
-        const silenceThreshold = 0.05
-        let lastAudioTime = Date.now()
-        if (rms > silenceThreshold) {
-          lastAudioTime = Date.now()
-        } else if (Date.now() - lastAudioTime > 2000 && transcript.trim().length > 0) {
-          // If silence for 2 seconds and we have transcript, auto-submit
-          console.log("Auto-submitting after silence detection")
-          stopRecording()
-          if (onStop) onStop(transcript)
+        // Improved silence detection for auto-submission
+        // Higher threshold to avoid background noise triggering
+        const silenceThreshold = 0.08 // Increased from 0.05 to better filter background noise
+
+        // Skip audio processing if AI is generating or we're in auto-submit process
+        if (!isAiGenerating && !autoSubmitInProgressRef.current) {
+          if (rms > silenceThreshold) {
+            // User is speaking
+            setIsSpeaking(true)
+            setSilenceStartTime(null)
+            setConsecutiveLowAudioFrames(0)
+
+            // Clear any existing timeouts
+            if (silenceTimeoutRef.current) {
+              clearTimeout(silenceTimeoutRef.current)
+              silenceTimeoutRef.current = null
+            }
+            if (autoSubmitTimeoutRef.current) {
+              clearTimeout(autoSubmitTimeoutRef.current)
+              autoSubmitTimeoutRef.current = null
+            }
+
+            // Update the last transcript reference
+            lastTranscriptRef.current = transcript
+          } else {
+            // Audio level is low - could be silence or background noise
+            // Count consecutive low audio frames
+            setConsecutiveLowAudioFrames((prev) => {
+              const newCount = prev + 1
+
+              // If we have consistent low audio for about 3 seconds (60 frames at 50ms intervals)
+              // AND we have a transcript, auto-submit
+              if (newCount >= 60 && lastTranscriptRef.current.trim().length > 0 && !autoSubmitTimeoutRef.current) {
+                console.log("Detected consistent low audio for 3 seconds, auto-submitting")
+
+                // Prevent multiple submissions
+                autoSubmitInProgressRef.current = true
+
+                autoSubmitTimeoutRef.current = setTimeout(() => {
+                  const finalTranscript = lastTranscriptRef.current.trim()
+                  console.log("Auto-submitting after consistent low audio:", finalTranscript)
+
+                  if (finalTranscript.length > 0 && !isShuttingDownRef.current) {
+                    // Set shutdown flag before stopping
+                    isShuttingDownRef.current = true
+                    
+                    // Stop recording
+                    stopRecording()
+
+                    // Ensure onStop is called with the final transcript
+                    if (onStop) {
+                      setTimeout(() => {
+                        onStop(finalTranscript)
+                      }, 100)
+                    }
+                  }
+
+                  autoSubmitTimeoutRef.current = null
+                }, 150)
+              }
+
+              return newCount
+            })
+
+            // Also keep the original silence detection logic as a backup
+            if (isSpeaking) {
+              if (silenceStartTime === null) {
+                setSilenceStartTime(Date.now())
+              } else {
+                // Check if silence has lasted long enough to auto-submit
+                const silenceDuration = Date.now() - silenceStartTime
+
+                // If silence for 2 seconds and we have transcript, schedule auto-submit
+                if (silenceDuration > 2000 && transcript.trim().length > 0 && !silenceTimeoutRef.current && !autoSubmitInProgressRef.current) {
+                  console.log("Silence detected, scheduling auto-submit")
+                  
+                  // Prevent multiple submissions
+                  autoSubmitInProgressRef.current = true
+                  
+                  silenceTimeoutRef.current = setTimeout(() => {
+                    console.log("Auto-submitting after silence")
+                    // Only auto-submit if we're still recording, have transcript, and not already shutting down
+                    if (isRecording && transcript.trim().length > 0 && !isShuttingDownRef.current) {
+                      const finalTranscript = transcript.trim()
+                      console.log("Auto-submitting transcript:", finalTranscript)
+                      
+                      // Set shutdown flag before stopping
+                      isShuttingDownRef.current = true
+                      
+                      // Stop recording
+                      stopRecording()
+                      
+                      // Ensure onStop is called with the current transcript
+                      if (onStop) {
+                        setTimeout(() => {
+                          onStop(finalTranscript)
+                        }, 100)
+                      }
+                    }
+                    silenceTimeoutRef.current = null
+                  }, 250) // Reduced from 500ms for faster response
+                }
+              }
+            }
+          }
+        } else if (isAiGenerating) {
+          // If AI is generating, we should stop processing audio actively
+          // but still collect the chunks for streaming
         }
 
         // Apply strong gain - AWS Transcribe needs loud, clear audio
@@ -208,8 +431,6 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
             processedChunk[i] = -0.9 - 0.1 * Math.tanh((-processedChunk[i] - 0.9) * 10)
           }
         }
-
-        console.log(`Boosted audio by ${gain.toFixed(2)}x (RMS: ${rms.toFixed(4)}, Peak: ${maxSample.toFixed(4)})`)
 
         // Store processed chunk for streaming
         audioChunksRef.current.push(processedChunk)
@@ -372,6 +593,8 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
         ;(async () => {
           let finalTranscript = ""
           let noResultCounter = 0
+          let lastTranscriptTime = Date.now()
+          let consistentEmptyResultsStartTime: number | null = null
 
           try {
             console.log("Starting to process transcription stream")
@@ -379,17 +602,100 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
               if (event?.TranscriptEvent?.Transcript) {
                 console.log("Received transcription event:", JSON.stringify(event, null, 2))
 
-                for (const result of event.TranscriptEvent.Transcript.Results || []) {
-                  if (result?.Alternatives && result.Alternatives.length > 0 && result.Alternatives[0].Transcript) {
-                    const text = result.Alternatives[0].Transcript
-                    console.log(`Received text: "${text}", IsPartial: ${result.IsPartial}`)
+                // Check if results array is empty
+                if (
+                  !event.TranscriptEvent.Transcript.Results ||
+                  event.TranscriptEvent.Transcript.Results.length === 0
+                ) {
+                  // Track consistent empty results
+                  if (consistentEmptyResultsStartTime === null) {
+                    consistentEmptyResultsStartTime = Date.now()
+                    console.log("First empty result detected, starting empty results timer")
+                  } else {
+                    const emptyDuration = Date.now() - consistentEmptyResultsStartTime
+                    const timeSinceLastTranscript = Date.now() - lastTranscriptTime
 
-                    // Handle partial vs final results
-                    if (!result.IsPartial) {
-                      finalTranscript += text + " "
-                      setTranscript(finalTranscript.trim())
-                    } else {
-                      setTranscript(text)
+                    // If we have consistent empty results for over 1.5 seconds AND
+                    // it's been over 1 second since we got actual transcript content
+                    if (
+                      emptyDuration > 1500 && 
+                      timeSinceLastTranscript > 1000 &&
+                      finalTranscript.trim().length > 0 && 
+                      !emptyResultsTimerRef.current &&
+                      !autoSubmitInProgressRef.current
+                    ) {
+                      console.log(`Empty results for ${emptyDuration}ms, scheduling auto-submit`)
+                      
+                      // Prevent multiple submissions
+                      autoSubmitInProgressRef.current = true
+                      
+                      // Schedule auto-submit
+                      emptyResultsTimerRef.current = setTimeout(() => {
+                        console.log("Auto-submitting after empty results")
+                        
+                        if (isRecording && finalTranscript.trim().length > 0 && !isShuttingDownRef.current) {
+                          const textToSubmit = finalTranscript.trim()
+                          console.log("Auto-submitting transcript:", textToSubmit)
+                          
+                          // Set shutdown flag before stopping
+                          isShuttingDownRef.current = true
+                          
+                          // Stop recording
+                          stopRecording()
+                          
+                          // First disconnect stream immediately to stop inputs
+                          if (streamRef.current) {
+                            streamRef.current.getTracks().forEach(track => track.stop())
+                          }
+                          
+                          // Force transcription client to stop by destroying it
+                          if (transcribeClientRef.current) {
+                            try {
+                              transcribeClientRef.current.destroy()
+                              transcribeClientRef.current = null
+                            } catch (e) {
+                              console.warn("Error destroying transcribe client:", e)
+                            }
+                          }
+                          
+                          // Call onStop with a slight delay after stopping
+                          if (onStop) {
+                            setTimeout(() => {
+                              onStop(textToSubmit)
+                            }, 100)
+                          }
+                        }
+                        
+                        emptyResultsTimerRef.current = null
+                      }, 100) // Even faster response
+                    }
+                  }
+                } else {
+                  // We got actual results, update the last transcript time
+                  lastTranscriptTime = Date.now()
+                  
+                  // Only reset empty results timer if we're not in auto-submit process
+                  if (!autoSubmitInProgressRef.current) {
+                    consistentEmptyResultsStartTime = null
+                    
+                    if (emptyResultsTimerRef.current) {
+                      clearTimeout(emptyResultsTimerRef.current)
+                      emptyResultsTimerRef.current = null
+                    }
+                  }
+
+                  for (const result of event.TranscriptEvent.Transcript.Results || []) {
+                    if (result?.Alternatives && result.Alternatives.length > 0 && result.Alternatives[0].Transcript) {
+                      const text = result.Alternatives[0].Transcript
+                      console.log(`Received text: "${text}", IsPartial: ${result.IsPartial}`)
+
+                      // Handle partial vs final results
+                      if (!result.IsPartial) {
+                        finalTranscript += text + " "
+                        setTranscript(finalTranscript.trim())
+                      } else {
+                        setTranscript(finalTranscript + text)
+                      }
                     }
                   }
                 }
@@ -429,12 +735,13 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
         })()
       }
 
-      // Set a maximum recording time
+      // Set a maximum recording time and clear emergency timeout when done
       setTimeout(() => {
         if (isRecording) {
           console.log("Auto-stopping recording after timeout")
           stopRecording()
         }
+        clearTimeout(emergencyTimeoutId)
       }, 20000) // 20 seconds max
     } catch (error) {
       console.error("Error setting up transcription:", error)
@@ -454,38 +761,39 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
   const cleanupResources = () => {
     console.log("Cleaning up resources")
 
+    // Reset flags
+    autoSubmitInProgressRef.current = false
+    isShuttingDownRef.current = false
+
     // Set state first to prevent race conditions
     setIsRecording(false)
+    setIsSpeaking(false)
+    setSilenceStartTime(null)
+    // Clear timers
+    if (emptyResultsTimerRef.current) {
+      clearTimeout(emptyResultsTimerRef.current)
+      emptyResultsTimerRef.current = null
+    }
+    setLastEmptyResultTime(null)
+    setTranscript("") // Reset transcript
 
-    // Disconnect and clean up audio nodes
-    if (processorRef.current) {
-      try {
-        processorRef.current.disconnect()
-        processorRef.current.onaudioprocess = null
-      } catch (e) {
-        console.warn("Error disconnecting processor:", e)
-      }
-      processorRef.current = null
+    // Clear any silence timeout
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = null
     }
 
-    if (sourceNodeRef.current) {
-      try {
-        sourceNodeRef.current.disconnect()
-      } catch (e) {
-        console.warn("Error disconnecting source:", e)
-      }
-      sourceNodeRef.current = null
+    // Clear auto-submit timeout
+    if (autoSubmitTimeoutRef.current) {
+      clearTimeout(autoSubmitTimeoutRef.current)
+      autoSubmitTimeoutRef.current = null
     }
+    setConsecutiveLowAudioFrames(0)
 
-    // Stop all media tracks
-    if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-      } catch (e) {
-        console.warn("Error stopping media tracks:", e)
-      }
-      streamRef.current = null
-    }
+    // Already disconnected in stopRecording, just nullify references
+    processorRef.current = null
+    sourceNodeRef.current = null
+    streamRef.current = null
 
     // Close audio context
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
@@ -509,20 +817,59 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
 
     // Reset transcript and audio chunks
     audioChunksRef.current = []
-    setTranscript("")
   }
 
   // Stop recording and cleanup
   const stopRecording = () => {
+    // Prevent double-stopping
+    if (isShuttingDownRef.current) {
+      console.log("Already shutting down, ignoring duplicate stop request")
+      return
+    }
+
     console.log("Stopping recording")
+    isShuttingDownRef.current = true
     setIsRecording(false)
     setStatusMessage("Processing final results...")
 
     // Store the current transcript for submission
-    const currentTranscript = transcript
+    const currentTranscript = transcript.trim()
 
-    // Ensure we give enough time for the audioGenerator to detect recording has stopped
-    // and for final results to come through
+    // Immediately stop all tracks to ensure audio stops flowing
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      } catch (e) {
+        console.warn("Error stopping tracks:", e)
+      }
+    }
+
+    // Clear any silence timeout
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = null
+    }
+
+    // Immediately disconnect all audio nodes
+    if (processorRef.current) {
+      try {
+        // First remove the audio processor callback
+        processorRef.current.onaudioprocess = null
+        processorRef.current.disconnect()
+      } catch (e) {
+        console.warn("Error disconnecting processor:", e)
+      }
+    }
+
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.disconnect()
+      } catch (e) {
+        console.warn("Error disconnecting source:", e)
+      }
+    }
+
+    // Ensure we give enough time for the final cleanup
     setTimeout(() => {
       console.log("Cleanup delay complete")
       // Only clean up resources if we're still not recording (prevent race conditions)
@@ -530,30 +877,63 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
         setSubmitted(false)
         setStatusMessage("")
         cleanupResources()
-
-        // If we have transcript, call onStop with it
-        if (currentTranscript.trim() && onStop) {
-          onStop(currentTranscript.trim())
-        }
       }
-    }, 1000) // Reduced from 5000ms to 1000ms for faster response
+      isShuttingDownRef.current = false
+    }, 400) // Even quicker for better responsiveness
+    
+    // Return the transcript so it can be used by callers
+    return currentTranscript
   }
 
   const handleClick = useCallback(() => {
+    // Don't allow starting recording if AI is generating
+    if (isAiGenerating) {
+      console.log("Cannot start recording while AI is generating a response")
+      toast({
+        title: "Wait for AI",
+        description: "Please wait until the AI response finishes generating.",
+        variant: "default",
+      })
+      return
+    }
+
+    // Prevent multiple clicks during shutdown
+    if (isShuttingDownRef.current) {
+      console.log("Cannot perform action while shutting down")
+      return
+    }
+
+    // In the handleClick function, add this to reset the timer
     if (!submitted) {
       // Starting a new recording
       setTranscript("") // Clear any previous transcript
+      setLastEmptyResultTime(null)
+      if (emptyResultsTimerRef.current) {
+        clearTimeout(emptyResultsTimerRef.current)
+        emptyResultsTimerRef.current = null
+      }
       startRecording()
     } else {
-      // Stopping current recording
+      // Stopping current recording - first save transcript
+      const currentTranscript = transcript.trim()
+      
+      // Manual stop by user - should submit if we have content
       stopRecording()
+      
+      // If there's content, call onStop
+      if (currentTranscript.length > 0 && onStop) {
+        // Small delay to allow cleanup to complete
+        setTimeout(() => {
+          onStop(currentTranscript)
+        }, 100)
+      }
 
       // Add a small delay before allowing restart
       setTimeout(() => {
         setSubmitted(false)
-      }, 1500)
+      }, 1000)
     }
-  }, [submitted, transcript])
+  }, [submitted, transcript, isAiGenerating, onStop])
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout
@@ -584,16 +964,38 @@ export function AwsTranscribeZenInput({ onStart, onStop, visualizerBars = 48, cl
     }
   }, [isRecording])
 
+  // Update the AI generation effect to use force cleanup if needed
+  useEffect(() => {
+    if (isAiGenerating && isRecording) {
+      console.log("AI is generating response, stopping recording")
+      const currentTranscript = transcript.trim()
+      
+      // Force cleanup to ensure we stop completely
+      forceImmediateCleanup()
+      
+      // Only submit if we have content
+      if (currentTranscript.length > 0 && onStop) {
+        // Small delay to allow cleanup to complete
+        setTimeout(() => {
+          onStop(currentTranscript)
+        }, 100)
+      }
+    }
+  }, [isAiGenerating, isRecording, transcript, onStop])
+
   return (
     <div className={cn("w-full py-4", className)}>
       <div className="relative max-w-xl w-full mx-auto flex items-center flex-col gap-2">
         <button
           className={cn(
             "group w-16 h-16 rounded-xl flex items-center justify-center transition-colors",
+            isAiGenerating ? "opacity-50 cursor-not-allowed" : "",
+            isShuttingDownRef.current ? "opacity-50 cursor-not-allowed" : "",
             submitted ? "bg-none" : "bg-none hover:bg-black/10 dark:hover:bg-white/10",
           )}
           type="button"
           onClick={handleClick}
+          disabled={isAiGenerating || isShuttingDownRef.current}
         >
           {submitted ? (
             <div
