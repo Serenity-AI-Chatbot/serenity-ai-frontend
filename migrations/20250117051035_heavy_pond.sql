@@ -650,3 +650,36 @@ GRANT EXECUTE ON FUNCTION get_user_chats TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_chats TO service_role;
 GRANT EXECUTE ON FUNCTION get_chat_messages TO authenticated;
 GRANT EXECUTE ON FUNCTION get_chat_messages TO service_role;
+
+-- Create function to delete a chat and all its messages
+CREATE OR REPLACE FUNCTION delete_chat(
+    p_chat_id UUID,
+    p_user_id UUID
+)
+RETURNS BOOLEAN LANGUAGE plpgsql AS $$
+DECLARE
+    chat_exists BOOLEAN;
+BEGIN
+    -- First check if the chat belongs to the user
+    SELECT EXISTS (
+        SELECT 1 FROM chats c
+        WHERE c.id = p_chat_id
+        AND c.user_id = p_user_id
+    ) INTO chat_exists;
+    
+    IF NOT chat_exists THEN
+        RAISE EXCEPTION 'Chat not found or access denied';
+    END IF;
+    
+    -- Delete the chat (cascade will delete messages automatically)
+    DELETE FROM chats
+    WHERE id = p_chat_id
+    AND user_id = p_user_id;
+    
+    RETURN TRUE;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION delete_chat TO authenticated;
+GRANT EXECUTE ON FUNCTION delete_chat TO service_role;
