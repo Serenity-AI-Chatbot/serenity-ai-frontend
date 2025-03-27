@@ -16,7 +16,7 @@ import {
   Engine, 
   VoiceId 
 } from "@aws-sdk/client-polly";
-import { AwsTranscribeInput } from "@/components/journal/aws-transcribe-input";
+import { AwsTranscribeZenInput } from "@/components/journal/aws-transcribe-input-zen";
 import {
   Sheet,
   SheetContent,
@@ -444,7 +444,7 @@ export default function ZenChat({ chatId }: { chatId: string }) {
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-6">
           {voiceRecognitionProvider === "awstranscribe" ? (
-            <AwsTranscribeInput
+            <AwsTranscribeZenInput
               onStart={() => setIsProcessing(true)}
               onStop={(text) => {
                 setIsProcessing(false);
