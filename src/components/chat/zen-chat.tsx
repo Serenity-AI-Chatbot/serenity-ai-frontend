@@ -54,11 +54,61 @@ export default function ZenChat({ chatId }: { chatId: string }) {
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("awspolly");
   const [pollyVoice, setPollyVoice] = useState("Joanna");
   const [voiceRecognitionProvider, setVoiceRecognitionProvider] = useState<VoiceRecognitionProvider>("awstranscribe");
+  const [shouldAutoRestart, setShouldAutoRestart] = useState(false);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
   const router = useRouter();
   const recognition = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isSubmittingRef = useRef(false);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
+
+  // Add function to auto-restart voice input
+  const autoRestartVoiceInput = () => {
+    console.log('Attempting to auto-restart voice input...');
+    console.log('Current provider:', voiceRecognitionProvider);
+    console.log('isSubmittingRef:', isSubmittingRef.current);
+    console.log('isAiGenerating:', isAiGenerating);
+    console.log('isVoiceSpeaking:', isVoiceSpeaking);
+    console.log('manuallyPaused:', manuallyPaused);
+    console.log('shouldAutoRestart:', shouldAutoRestart);
+
+    // Don't restart if manually paused or auto-restart not enabled
+    if (manuallyPaused || !shouldAutoRestart) {
+      console.log('Skipping auto-restart due to manual pause or auto-restart disabled');
+      return;
+    }
+
+    if (voiceRecognitionProvider === "webspeech") {
+      if (!isListening && recognition.current) {
+        console.log('Starting WebSpeech recognition...');
+        toggleListening();
+      }
+    } else if (voiceRecognitionProvider === "awstranscribe") {
+      // Try multiple selectors to find the correct button
+      const selectors = [
+        'button.group.w-16.h-16',
+        '.w-16.h-16.rounded-xl button',
+        'button[aria-label="Record"]',
+        'button:not([class*="Sheet"])',
+        '.relative.max-w-xl button'
+      ];
+
+      let awsTranscribeInput = null;
+      for (const selector of selectors) {
+        const button = document.querySelector(selector) as HTMLButtonElement;
+        console.log(`Trying selector "${selector}":`, button);
+        if (button) {
+          awsTranscribeInput = button;
+          break;
+        }
+      }
+
+      if (awsTranscribeInput && !isSubmittingRef.current) {
+        console.log('Found AWS Transcribe button, clicking...');
+        awsTranscribeInput.click();
+      }
+    }
+  };
 
   useEffect(() => {
     // Initialize speech recognition
@@ -96,6 +146,19 @@ export default function ZenChat({ chatId }: { chatId: string }) {
     };
   }, []);
 
+  // Modify effect to handle both WebSpeech and AWS Transcribe
+  useEffect(() => {
+    if (!isVoiceSpeaking && !isAiGenerating && shouldAutoRestart) {
+      console.log('Voice stopped speaking, preparing to restart input...');
+      // Small delay to ensure everything is cleaned up
+      const timer = setTimeout(() => {
+        console.log('Timeout complete, calling autoRestartVoiceInput...');
+        autoRestartVoiceInput();
+      }, 1000); // Increased delay to 1 second for better cleanup
+      return () => clearTimeout(timer);
+    }
+  }, [isVoiceSpeaking, isAiGenerating, shouldAutoRestart]);
+
   useEffect(() => {
     // Add effect to stop WebSpeech recognition when AI is generating
     if (isAiGenerating && recognition.current && isListening) {
@@ -132,6 +195,15 @@ export default function ZenChat({ chatId }: { chatId: string }) {
 
   const handleSubmit = async (text: string) => {
     if (!text.trim() || isProcessing || isSubmittingRef.current) return;
+
+    // Don't submit if it's a "no speech detected" message
+    if (text.toLowerCase().includes("no speech detected")) {
+      console.log('Ignoring "no speech detected" message');
+      setIsProcessing(false);
+      setIsAiGenerating(false);
+      isSubmittingRef.current = false;
+      return;
+    }
 
     // Set the ref to prevent duplicate submissions
     isSubmittingRef.current = true;
@@ -185,6 +257,10 @@ export default function ZenChat({ chatId }: { chatId: string }) {
           }
         }
       }
+
+      // Enable auto-restart for the next round and reset manual pause
+      setShouldAutoRestart(true);
+      setManuallyPaused(false);
 
       // Speak the response
       await speakText(assistantMessage);
@@ -388,6 +464,18 @@ export default function ZenChat({ chatId }: { chatId: string }) {
     };
   }, []);
 
+  // Handle manual stop/start
+  const handleManualToggle = () => {
+    if (isListening || isSubmittingRef.current) {
+      // User is manually stopping
+      setManuallyPaused(true);
+      setShouldAutoRestart(false);
+    } else {
+      // User is manually starting
+      setManuallyPaused(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Top Navigation Bar */}
@@ -556,13 +644,15 @@ export default function ZenChat({ chatId }: { chatId: string }) {
                   <AwsTranscribeZenInput
                     onStart={() => {
                       if (isAiGenerating || isSubmittingRef.current) return;
+                      handleManualToggle();
                       setIsProcessing(true);
                     }}
                     onStop={(text) => {
                       setIsProcessing(false);
+                      handleManualToggle();
                       if (text && text.trim()) {
                         console.log("AWS Transcribe finished with text:", text);
-                        handleVoiceInput(text);
+                        handleSubmit(text);
                       }
                     }}
                     isAiGenerating={isAiGenerating || isSubmittingRef.current}
