@@ -38,6 +38,8 @@ export function prepareChatMessages(
     ${chatHistory}
   `;
 
+  console.log("enhancedContext", enhancedContext);
+
   return [
     { role: "user", parts: [{ text: "Initialize chat" }] },
     { role: "model", parts: [{ text: SYSTEM_PROMPT }] },
