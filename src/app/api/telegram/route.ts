@@ -10,6 +10,35 @@ import { prepareChatMessages, streamChatResponseWithSave, generateChatTitle, sav
 // Set the runtime to edge for better performance
 export const runtime = "edge";
 
+// Function to get chat history from telegram_messages
+async function getTelegramChatHistory(chatId: string, limit: number = 10) {
+  const { data, error } = await supabase
+    .rpc('get_telegram_chat_history', { 
+      p_chat_id: chatId,
+      p_limit: limit 
+    });
+  
+  if (error) {
+    console.error("Error fetching chat history:", error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// Format telegram chat history to chat messages
+function formatChatHistory(history: any[]): string {
+  if (!history || history.length === 0) return "";
+  
+  // Format in chronological order (oldest first)
+  const chronologicalHistory = [...history].reverse();
+  
+  return chronologicalHistory.map(msg => {
+    const role = msg.is_bot ? "Assistant" : "User";
+    return `${role}: ${msg.content}`;
+  }).join("\n\n");
+}
+
 export async function POST(req: Request) {
   if (!process.env.GEMINI_API_KEY) {
     return new Response("Missing API key", { status: 500 });
@@ -53,6 +82,10 @@ export async function POST(req: Request) {
       is_bot: false
     });
 
+    // Get recent chat history
+    const chatHistory = await getTelegramChatHistory(from, 10);
+    const formattedChatHistory = formatChatHistory(chatHistory);
+
     // Create a single message for the AI
     const messages: ChatMessage[] = [
       { role: "user", content: message }
@@ -75,7 +108,7 @@ export async function POST(req: Request) {
       activitiesContext, 
       moodAnalysis, 
       recommendations, 
-      "" // No chat history for Telegram
+      formattedChatHistory // Include chat history for context
     );
     
     // Process with AI and get response
