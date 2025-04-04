@@ -34,10 +34,32 @@ function formatChatHistory(history: any[]): string {
   // Format in chronological order (oldest first)
   const chronologicalHistory = [...history].reverse();
   
-  return chronologicalHistory.map(msg => {
+  let formattedHistory = chronologicalHistory.map(msg => {
     const role = msg.is_bot ? "Assistant" : "User";
     return `${role}: ${msg.content}`;
   }).join("\n\n");
+
+  console.log(`Formatted chat history: ${formattedHistory}`);
+
+  return formattedHistory;
+}
+
+// Function to clear chat history for a specific chat ID
+async function clearChatHistory(chatId: string) {
+  console.log(`Clearing chat history for chat ID: ${chatId}`);
+  
+  const { error } = await supabase
+    .from('telegram_messages')
+    .delete()
+    .eq('telegram_chat_id', chatId);
+    
+  if (error) {
+    console.error("Error clearing chat history:", error);
+    throw error;
+  }
+  
+  console.log(`Successfully cleared chat history for chat ID: ${chatId}`);
+  return true;
 }
 
 // POST handler for receiving webhook updates from Telegram
@@ -108,6 +130,14 @@ async function processUpdate(data: any) {
         }
 
         const userId = telegramUser.user_id;
+        
+        // Handle /clear command to delete chat history
+        if (userMessage.trim().toLowerCase() === '/clear') {
+          await clearChatHistory(chatId.toString());
+          await sendTelegramMessage(chatId, "Your chat history has been cleared.");
+          return;
+        }
+        
         const model = getGeminiModel("gemini-2.0-flash");
         
         // Store message in telegram_messages table
