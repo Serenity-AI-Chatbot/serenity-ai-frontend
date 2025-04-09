@@ -35,11 +35,12 @@ export async function saveUserContext(
     let result;
     
     if (existingData) {
-      // Update existing entity with merged information
-      const mergedInfo = {
-        ...existingData.information,
-        ...information
-      };
+      console.log("Existing information for entity:", entityName, existingData.information);
+      console.log("New information for entity:", entityName, information);
+      
+      // Update existing entity with properly merged information
+      const mergedInfo = mergeInformation(existingData.information, information);
+      console.log("Merged information for entity:", entityName, mergedInfo);
       
       const { data, error } = await supabase
         .from('user_context')
@@ -296,4 +297,47 @@ function extractKeywords(text: string): string[] {
     .replace(/[^\w\s]/g, '')
     .split(/\s+/)
     .filter(word => !stopWords.has(word) && word.length > 2);
+}
+
+/**
+ * Deep merge information objects to preserve existing data
+ * while adding new information
+ */
+function mergeInformation(existing: Record<string, any>, incoming: Record<string, any>): Record<string, any> {
+  const result = { ...existing };
+  
+  // Process each field from the incoming information
+  Object.entries(incoming).forEach(([key, value]) => {
+    // If the field doesn't exist in the existing info, just add it
+    if (!result[key]) {
+      result[key] = value;
+      return;
+    }
+    
+    // Handle arrays - combine them without duplicates
+    if (Array.isArray(result[key]) && Array.isArray(value)) {
+      // Combine arrays and remove duplicates
+      result[key] = [...new Set([...result[key], ...value])];
+      return;
+    }
+    
+    // Handle nested objects - recursively merge them
+    if (typeof result[key] === 'object' && typeof value === 'object' && 
+        !Array.isArray(result[key]) && !Array.isArray(value)) {
+      result[key] = mergeInformation(result[key], value);
+      return;
+    }
+    
+    // For description and relationship fields, don't overwrite unless empty
+    if (['description', 'relationship'].includes(key) && result[key] && result[key].trim() !== '') {
+      // Append new information instead of replacing
+      result[key] = `${result[key]}; ${value}`;
+      return;
+    }
+    
+    // For other fields, the new value takes precedence
+    result[key] = value;
+  });
+  
+  return result;
 } 
