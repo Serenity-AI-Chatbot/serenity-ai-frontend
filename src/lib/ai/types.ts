@@ -78,3 +78,25 @@ export const datePatterns = {
   dateRange: /(?:between|from)\s+(.+?)\s+(?:to|and|until)\s+(.+)/i,
   specificDate: /(?:on\s+)?([A-Za-z]+day,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4})/i
 }; 
+
+export interface UserContext {
+  id?: string;
+  user_id?: string;
+  entity_name: string;
+  entity_type: string;
+  information: Record<string, any>;
+  relevance_score?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserContextSaveResult {
+  success: boolean;
+  message: string;
+  context?: UserContext;
+}
+
+export interface FunctionCall {
+  name: string;
+  args: Record<string, any>;
+} 

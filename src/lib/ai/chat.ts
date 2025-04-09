@@ -12,11 +12,15 @@ export function prepareChatMessages(
   activitiesContext: string, 
   moodAnalysis: MoodAnalysis, 
   recommendations: ActivityRecommendation[], 
-  chatHistory: string
+  chatHistory: string,
+  userContext: string = ''
 ) {
   const enhancedContext = `
     Journal Context:
     ${journalContext}
+
+    User Context:
+    ${userContext}
     
     Mood Analysis:
     - Dominant Mood: ${moodAnalysis.dominant_mood}

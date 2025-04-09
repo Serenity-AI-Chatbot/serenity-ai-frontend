@@ -6,6 +6,8 @@ import { fetchActivities } from "@/lib/ai/activities";
 import { formatJournalEntries } from "@/lib/ai/journals";
 import { formatActivities } from "@/lib/ai/activities";
 import { prepareChatMessages, streamChatResponseWithSave, generateChatTitle, saveUserMessage, handleError } from "@/lib/ai/chat";
+import { fetchRelevantUserContext, formatUserContext } from "@/lib/ai/user-context";
+import { extractUserContext } from "@/lib/ai/user-context-function-calling";
 
 // Set the runtime to edge for better performance
 export const runtime = "edge";
@@ -23,7 +25,6 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id;
-  const model = getGeminiModel("gemini-2.0-flash");
   const latestUserMessage = messages[messages.length - 1]?.content || "";
 
   try {
@@ -38,14 +39,21 @@ export async function POST(req: Request) {
     // Fetch and format activities
     const activities = await fetchActivities();
 
-    // Format contexts
+    // Extract and save user context
+    await extractUserContext(userId, latestUserMessage);
+
+    // Fetch relevant user context (including any newly extracted context)
+    const userContextItems = await fetchRelevantUserContext(userId, latestUserMessage);
+    console.log("User context items:", userContextItems);
+
+    // // Format contexts
     const journalContext = formatJournalEntries(entries);
     const activitiesContext = formatActivities(activities);
+    const userContext = formatUserContext(userContextItems);
 
-    // Prepare and send chat message
-    const geminiMessages = prepareChatMessages(messages, journalContext, activitiesContext, moodAnalysis, recommendations, chatHistory);
-    
-    // Create or update chat in database
+    console.log("User context:", userContext);
+
+    // // Create or update chat in database
     let currentChatId = chatId;
     
     if (!currentChatId) {
@@ -79,8 +87,21 @@ export async function POST(req: Request) {
     // Save the user message to the database
     await saveUserMessage(currentChatId, latestUserMessage);
     
+    // Now proceed with the regular chat process with enhanced context
+    const geminiMessagesForChat = prepareChatMessages(
+      messages, 
+      journalContext, 
+      activitiesContext, 
+      moodAnalysis, 
+      recommendations, 
+      chatHistory,
+      userContext
+    );
+    
+    const regularModel = getGeminiModel("gemini-2.0-flash");
+    
     // Stream the response back to the client
-    return await streamChatResponseWithSave(model, geminiMessages, latestUserMessage, currentChatId);
+    return await streamChatResponseWithSave(regularModel, geminiMessagesForChat, latestUserMessage, currentChatId);
   } catch (error) {
     return handleError(error);
   }
