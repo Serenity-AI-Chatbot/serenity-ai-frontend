@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TagInput } from '@/components/user/tag-input';
 import { useToast } from '@/hooks/use-toast';
+import { InfoIcon, Plus, Save, X } from 'lucide-react';
+
 interface UserContextFormProps {
   initialData: UserContextItem | null;
   onSave: (savedItem: UserContextItem) => void;
@@ -159,25 +161,37 @@ export default function UserContextForm({ initialData, onSave, onCancel }: UserC
   };
 
   return (
-    <Card className="p-6">
+    <Card className="p-6 border-emerald-100 shadow-md">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-emerald-700 mb-2">
+          {initialData ? 'Edit' : 'Add New'} Information
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          {initialData
+            ? 'Update the details below to modify this information.'
+            : 'Fill in the details below to add new personal context information.'}
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="entity-name">Name</Label>
+              <Label htmlFor="entity-name" className="text-emerald-700">Name</Label>
               <Input 
                 id="entity-name" 
                 value={entityName} 
                 onChange={(e) => setEntityName(e.target.value)}
                 placeholder="E.g., John Smith, Home, Work Project"
+                className="border-emerald-200 focus-visible:ring-emerald-500"
                 required
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="entity-type">Type</Label>
+              <Label htmlFor="entity-type" className="text-emerald-700">Type</Label>
               <Select value={entityType} onValueChange={setEntityType}>
-                <SelectTrigger id="entity-type">
+                <SelectTrigger id="entity-type" className="border-emerald-200 focus-visible:ring-emerald-500">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,94 +204,148 @@ export default function UserContextForm({ initialData, onSave, onCancel }: UserC
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-emerald-700">Description</Label>
             <Textarea 
               id="description" 
               value={description} 
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide a detailed description"
+              className="border-emerald-200 focus-visible:ring-emerald-500"
               rows={3}
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="relationship">Relationship (if applicable)</Label>
+            <Label htmlFor="relationship" className="text-emerald-700">Relationship (if applicable)</Label>
             <Input 
               id="relationship" 
               value={relationship} 
               onChange={(e) => setRelationship(e.target.value)}
               placeholder="E.g., Friend, Colleague, Favorite restaurant"
+              className="border-emerald-200 focus-visible:ring-emerald-500"
             />
           </div>
           
-          <div className="space-y-2">
-            <Label>Preferences (optional)</Label>
-            <TagInput
-              placeholder="Add preferences and press Enter"
-              tags={preferences}
-              setTags={setPreferences}
-            />
-            <p className="text-sm text-muted-foreground">Press Enter to add each preference</p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Important Dates (optional)</Label>
-            <TagInput
-              placeholder="Add important dates and press Enter"
-              tags={importantDates}
-              setTags={setImportantDates}
-            />
-            <p className="text-sm text-muted-foreground">Format: Date - Description (e.g., "May 15 - Birthday")</p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Notes (optional)</Label>
-            <TagInput
-              placeholder="Add notes and press Enter"
-              tags={notes}
-              setTags={setNotes}
-            />
+          <div className="p-4 bg-emerald-50/50 rounded-lg space-y-6 border border-emerald-100">
+            <div className="space-y-2">
+              <Label className="text-emerald-700 flex items-center">
+                <InfoIcon className="h-4 w-4 mr-1" /> Preferences (optional)
+              </Label>
+              <TagInput
+                placeholder="Add preferences and press Enter"
+                tags={preferences}
+                setTags={setPreferences}
+                className="bg-white"
+              />
+              <p className="text-sm text-muted-foreground">Press Enter to add each preference</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-emerald-700 flex items-center">
+                <InfoIcon className="h-4 w-4 mr-1" /> Important Dates (optional)
+              </Label>
+              <TagInput
+                placeholder="Add important dates and press Enter"
+                tags={importantDates}
+                setTags={setImportantDates}
+                className="bg-white"
+              />
+              <p className="text-sm text-muted-foreground">Format: Date - Description (e.g., "May 15 - Birthday")</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-emerald-700 flex items-center">
+                <InfoIcon className="h-4 w-4 mr-1" /> Notes (optional)
+              </Label>
+              <TagInput
+                placeholder="Add notes and press Enter"
+                tags={notes}
+                setTags={setNotes}
+                className="bg-white"
+              />
+            </div>
           </div>
           
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Custom Fields (optional)</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
-                Add Field
+              <Label className="text-emerald-700">Custom Fields (optional)</Label>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addCustomField}
+                className="border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Field
               </Button>
             </div>
             
-            {customFields.map((field, index) => (
-              <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                <Input
-                  placeholder="Field name"
-                  value={field.key}
-                  onChange={(e) => updateCustomField(index, 'key', e.target.value)}
-                />
-                <Input
-                  placeholder="Value"
-                  value={field.value}
-                  onChange={(e) => updateCustomField(index, 'value', e.target.value)}
-                />
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => removeCustomField(index)}
-                  className="text-destructive"
-                >
-                  ✕
-                </Button>
+            {customFields.length > 0 ? (
+              <div className="space-y-3">
+                {customFields.map((field, index) => (
+                  <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <Input
+                      placeholder="Field name"
+                      value={field.key}
+                      onChange={(e) => updateCustomField(index, 'key', e.target.value)}
+                      className="border-emerald-200 focus-visible:ring-emerald-500"
+                    />
+                    <Input
+                      placeholder="Value"
+                      value={field.value}
+                      onChange={(e) => updateCustomField(index, 'value', e.target.value)}
+                      className="border-emerald-200 focus-visible:ring-emerald-500"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => removeCustomField(index)}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-4 border border-dashed border-emerald-200 rounded-lg bg-emerald-50/30">
+                <p className="text-muted-foreground text-sm">
+                  Add custom fields for any additional information
+                </p>
+              </div>
+            )}
           </div>
           
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <div className="flex justify-end space-x-3 pt-6 border-t border-emerald-100">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onCancel} 
+              disabled={isSubmitting}
+              className="border-slate-300"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : initialData ? 'Update' : 'Save'}
+            <Button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Save className="h-4 w-4 mr-2" />
+                  {initialData ? 'Update' : 'Save'}
+                </span>
+              )}
             </Button>
           </div>
         </div>

@@ -4,14 +4,16 @@ import { useState, KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface TagInputProps {
   placeholder?: string;
   tags: string[];
   setTags: (tags: string[]) => void;
+  className?: string;
 }
 
-export function TagInput({ placeholder, tags, setTags }: TagInputProps) {
+export function TagInput({ placeholder, tags, setTags, className }: TagInputProps) {
   const [inputValue, setInputValue] = useState('');
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -37,14 +39,21 @@ export function TagInput({ placeholder, tags, setTags }: TagInputProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+    <div className={cn(
+      "flex flex-wrap items-center gap-2 p-2 border rounded-md focus-within:ring-2 focus-within:ring-emerald-500 focus-within:ring-offset-2 border-emerald-200",
+      className
+    )}>
       {tags.map((tag, index) => (
-        <Badge key={index} variant="secondary" className="gap-1 px-2 py-1">
+        <Badge 
+          key={index} 
+          variant="secondary" 
+          className="gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200"
+        >
           {tag}
           <button
             type="button"
             onClick={() => removeTag(index)}
-            className="ml-1 rounded-full hover:bg-muted p-1"
+            className="ml-1 rounded-full hover:bg-emerald-100 p-1"
           >
             <X className="h-3 w-3" />
             <span className="sr-only">Remove {tag}</span>
