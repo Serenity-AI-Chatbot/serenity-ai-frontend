@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MoodFeedback } from "@/components/mood-feedback";
 
 // Custom tag interface for TagCloud
 interface MoodTag {
@@ -418,12 +419,10 @@ export function MoodInsights() {
           ) : (
             <div className="flex h-[200px] items-center justify-center">
               <div className="text-muted-foreground">No mood data available for the selected time period</div>
-            
             </div>
           )}
         </CardContent>
       </Card>
-
 
       <Card>
         <CardHeader>
@@ -490,6 +489,7 @@ export function MoodInsights() {
           )}
         </CardContent>
       </Card>
+      <MoodFeedback moodTag={dominantMood} />
     </div>
   );
 }

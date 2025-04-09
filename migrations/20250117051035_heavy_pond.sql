@@ -748,4 +748,37 @@ CREATE POLICY telegram_messages_service_all ON telegram_messages
 
 -- Allow webhook function to access telegram data
 GRANT SELECT, INSERT, UPDATE ON telegram_users TO anon, authenticated;
-GRANT SELECT, INSERT ON telegram_messages TO anon, authenticated; 
+GRANT SELECT, INSERT ON telegram_messages TO anon, authenticated;
+
+-- Drop the old mood_feedback table if it exists
+DROP TABLE IF EXISTS mood_feedback;
+
+-- Create table for mood feedback
+CREATE TABLE IF NOT EXISTS mood_feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  mood_tag TEXT NOT NULL,
+  accuracy_rating INT CHECK (accuracy_rating BETWEEN 1 AND 5),
+  feedback_comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_mood_feedback_user_id ON mood_feedback(user_id);
+
+-- Enable RLS
+ALTER TABLE mood_feedback ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view their own mood feedback"
+  ON mood_feedback
+  FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own mood feedback"
+  ON mood_feedback
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+-- Grant necessary permissions
+GRANT SELECT, INSERT ON mood_feedback TO authenticated; 

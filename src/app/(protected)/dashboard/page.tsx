@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MoodInsights } from "@/components/mood-insights"
 import { NavigationLinks } from "@/components/navigation-links"
-import { getUserName } from "@/lib/auth" // Assume this function exists to get the user's name
+import { getUserName } from "@/lib/auth" 
 
 export default async function Home() {
   const userName = await getUserName()
