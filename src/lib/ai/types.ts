@@ -80,15 +80,17 @@ export const datePatterns = {
 }; 
 
 export interface UserContext {
-  id?: string;
-  user_id?: string;
+  id: number;
+  user_id: string;
   entity_name: string;
   entity_type: string;
   information: Record<string, any>;
-  relevance_score?: number;
-  created_at?: string;
-  updated_at?: string;
+  relevance_score: number;
+  created_at: string;
+  updated_at: string;
 }
+
+export type UserContextItem = UserContext;
 
 export interface UserContextSaveResult {
   success: boolean;

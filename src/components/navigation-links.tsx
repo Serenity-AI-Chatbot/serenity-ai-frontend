@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Activity, MessageSquare, Sparkles } from "lucide-react"
+import { BookOpen, Activity, MessageSquare, Sparkles, User } from "lucide-react"
 
 export function NavigationLinks() {
   return (
@@ -23,6 +23,11 @@ export function NavigationLinks() {
         <Link href="/chat" passHref>
           <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
             <MessageSquare className="mr-2 h-4 w-4" /> Chat
+          </Button>
+        </Link>
+        <Link href="/user" passHref>
+          <Button variant="outline" className="w-full border-emerald-500 text-emerald-500 hover:bg-emerald-50">
+            <User className="mr-2 h-4 w-4" /> Personal Info
           </Button>
         </Link>
         <Link href="/suggestions" passHref>
