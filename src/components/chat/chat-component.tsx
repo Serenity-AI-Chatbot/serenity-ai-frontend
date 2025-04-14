@@ -531,13 +531,12 @@ export default function ChatComponent() {
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto bg-white dark:bg-black shadow-xl rounded-xl overflow-hidden">
-      <CardHeader className="bg-emerald-500 text-white p-6">
+    <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900">
+      {/* Header */}
+      <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm py-3 px-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold">
-            Chat with Serenity-AI
-          </CardTitle>
-          <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Serenity AI</h1>
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
@@ -547,7 +546,7 @@ export default function ChatComponent() {
                 }
               }}
               disabled={!currentChatId}
-              className="text-white hover:bg-emerald-600"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <Sparkles className="h-4 w-4 mr-1" />
               Zen Mode
@@ -556,7 +555,7 @@ export default function ChatComponent() {
               variant="ghost"
               size="sm"
               onClick={handleNewChat}
-              className="text-white hover:bg-emerald-600"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <Plus className="h-4 w-4 mr-1" />
               New Chat
@@ -566,240 +565,277 @@ export default function ChatComponent() {
               size="sm"
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={!currentChatId}
-              className="text-white hover:bg-emerald-600"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Delete Chat
             </Button>
           </div>
         </div>
-        <div className="mt-4">
-          <Select
-            value={currentChatId || ""}
-            onValueChange={handleSelectChat}
-            disabled={isLoadingChats}
-          >
-            <SelectTrigger className="bg-emerald-600 text-white border-emerald-700">
-              <SelectValue placeholder={isLoadingChats ? "Loading chats..." : "Select a conversation"} />
-            </SelectTrigger>
-            <SelectContent>
+      </header>
+
+      {/* Main area with sidebar and chat */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-64 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 hidden md:block overflow-y-auto">
+          <div className="p-4 space-y-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-2 border-gray-300 dark:border-gray-700"
+              onClick={handleNewChat}
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </Button>
+            
+            <div className="space-y-1">
               {chats.map((chat) => (
-                <SelectItem key={chat.id} value={chat.id}>
-                  <div className="flex flex-col justify-center items-center">
-                    <span className="font-medium">{chat.title}</span>
-                    {/* <span className="text-xs text-white dark:text-emerald-500/70">
-                      {formatDate(chat.updated_at)} · {chat.message_count} messages
-                    </span> */}
-                  </div>
-                </SelectItem>
+                <button
+                  key={chat.id}
+                  onClick={() => handleSelectChat(chat.id)}
+                  className={`w-full text-left px-3 py-2 rounded-md flex items-center gap-2 text-sm ${
+                    currentChatId === chat.id 
+                      ? "bg-gray-200 dark:bg-gray-700" 
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <span className="truncate">{chat.title}</span>
+                </button>
               ))}
               {chats.length === 0 && !isLoadingChats && (
-                <SelectItem value="empty" disabled>
+                <p className="text-sm text-gray-500 dark:text-gray-400 px-3 py-2">
                   No conversations yet
-                </SelectItem>
+                </p>
               )}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent className="p-6">
-        <ScrollArea className="h-[60vh] pr-4" ref={scrollAreaRef}>
-          {messages.length === 0 && (
-            <div className="text-center text-gray-500 dark:text-emerald-500/70 mb-4">
-              <p className="text-lg font-semibold">Welcome to Serenity-AI!</p>
-              <p>
-                I'm here to support your mental well-being. Feel free to ask me
-                anything or try one of the suggested prompts below.
-              </p>
+              {isLoadingChats && (
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                  <span className="text-sm text-gray-500">Loading chats...</span>
+                </div>
+              )}
             </div>
-          )}
-          {messages.map((m, index) => (
-            <div
-              key={index}
-              className={`mb-4 ${
-                m.role === "user" ? "text-right" : "text-left"
-              }`}
-            >
-              <div
-                className={`inline-block p-3 rounded-lg ${
-                  m.role === "user"
-                    ? "bg-emerald-500 text-white"
-                    : "bg-gray-100 dark:bg-black border border-emerald-500/20 text-gray-900 dark:text-emerald-500"
-                }`}
-              >
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  className="prose dark:prose-invert max-w-none prose-emerald"
-                >
-                  {m.content}
-                </ReactMarkdown>
+            
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="voice-response"
+                    checked={isVoiceResponseEnabled}
+                    onCheckedChange={(checked) =>
+                      setIsVoiceResponseEnabled(checked as boolean)
+                    }
+                    className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+                  />
+                  <label
+                    htmlFor="voice-response"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-gray-300"
+                  >
+                    🔈 Enable AI voice
+                  </label>
+                </div>
+                
+                {isVoiceResponseEnabled && (
+                  <div className="space-y-2">
+                    <Select
+                      value={voiceProvider}
+                      onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select voice provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
+                        <SelectItem value="awspolly">AWS Polly (Premium)</SelectItem>
+                        <SelectItem value="elevenlabs">ElevenLabs (Limited Credit)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {voiceProvider === "awspolly" && (
+                      <Select
+                        value={pollyVoice}
+                        onValueChange={(value) => setPollyVoice(value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select AWS Polly voice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Joanna">Joanna (Female)</SelectItem>
+                          <SelectItem value="Matthew">Matthew (Male)</SelectItem>
+                          <SelectItem value="Salli">Salli (Female)</SelectItem>
+                          <SelectItem value="Kimberly">Kimberly (Female)</SelectItem>
+                          <SelectItem value="Kevin">Kevin (Male)</SelectItem>
+                          <SelectItem value="Amy">Amy (Female, British)</SelectItem>
+                          <SelectItem value="Brian">Brian (Male, British)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
+                
+                <div className="pt-1">
+                  <label className="text-sm font-medium text-gray-900 dark:text-gray-300 block mb-1">
+                    🎤 Voice Recognition
+                  </label>
+                  <Select
+                    value={voiceRecognitionProvider}
+                    onValueChange={(value: VoiceRecognitionProvider) => setVoiceRecognitionProvider(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select voice recognition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webspeech">Web Speech API</SelectItem>
+                      <SelectItem value="awstranscribe">AWS Transcribe</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="text-left">
-              <span className="inline-block p-3 rounded-lg bg-gray-100 dark:bg-black border border-emerald-500/20 text-gray-900 dark:text-emerald-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </span>
-            </div>
-          )}
-        </ScrollArea>
-        {messages.length === 0 && (
-          <div className="mt-6">
-            <p className="text-sm font-semibold mb-2 text-gray-900 dark:text-emerald-500">
-              Suggested prompts:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTED_PROMPTS.map((prompt, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSuggestedPrompt(prompt)}
-                  className="border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                >
-                  {prompt}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="border-t border-gray-200 dark:border-emerald-500/20 p-4">
-        <form onSubmit={handleSubmit} className="flex w-full space-x-2">
-          <Input
-            value={input}
-            onChange={handleInputChange}
-            placeholder="Type your message..."
-            className="flex-grow bg-white dark:bg-black border-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
-          />
-          <Dialog open={isVoiceInputOpen} onOpenChange={setIsVoiceInputOpen}>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setIsVoiceInputOpen(true)}
-              className="border-emerald-500"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Voice Input</DialogTitle>
-                <DialogDescription>
-                  Speak to add text to your message
-                </DialogDescription>
-              </DialogHeader>
-              {voiceRecognitionProvider === "webspeech" ? (
-                <AIVoiceInput
-                  onStart={() => setVoiceText("")}
-                  onStop={handleVoiceInput}
-                />
-              ) : (
-                <AwsTranscribeInput
-                  onStart={() => setVoiceText("")}
-                  onStop={handleVoiceInput}
-                />
-              )}
-              <p className="mt-4 text-center text-sm text-gray-500">
-                {voiceText || "Speak now..."}
-              </p>
-            </DialogContent>
-          </Dialog>
-          <Button
-            type="submit"
-            disabled={isTyping}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white"
-          >
-            Send
-          </Button>
-        </form>
-      </CardFooter>
-      <div className="px-4 pb-4 space-y-4">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="voice-response"
-              checked={isVoiceResponseEnabled}
-              onCheckedChange={(checked) =>
-                setIsVoiceResponseEnabled(checked as boolean)
-              }
-              className="border-emerald-500 data-[state=checked]:bg-emerald-500"
-            />
-            <label
-              htmlFor="voice-response"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-emerald-500"
-            >
-              🔈 Enable AI voice responses
-            </label>
-          </div>
-          {isVoiceResponseEnabled && (
-            <div className="space-y-2">
-              <Select
-                value={voiceProvider}
-                onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select voice provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
-                  <SelectItem value="awspolly">AWS Polly (Premium)</SelectItem>
-                  <SelectItem value="elevenlabs">ElevenLabs (Limited Credit 🥲)</SelectItem>
-                </SelectContent>
-              </Select>
               
-              {voiceProvider === "awspolly" && (
-                <Select
-                  value={pollyVoice}
-                  onValueChange={(value) => setPollyVoice(value)}
+              <Button
+                variant="outline"
+                onClick={handleClearChat}
+                className="w-full border-gray-300 dark:border-gray-700"
+              >
+                Clear Chat
+              </Button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main chat area */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4" ref={scrollAreaRef}>
+            <div className="max-w-3xl mx-auto space-y-6">
+              {messages.length === 0 && (
+                <div className="text-center py-20">
+                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Welcome to Serenity-AI</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                    I'm here to support your mental well-being. Feel free to ask me anything or try one of the suggested prompts below.
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {SUGGESTED_PROMPTS.map((prompt, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSuggestedPrompt(prompt)}
+                        className="border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        {prompt}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {messages.map((m, index) => (
+                <div
+                  key={index}
+                  className={`${
+                    m.role === "assistant" ? "bg-gray-50 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 py-8" : "py-4"
+                  }`}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select AWS Polly voice" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Joanna">Joanna (Female)</SelectItem>
-                    <SelectItem value="Matthew">Matthew (Male)</SelectItem>
-                    <SelectItem value="Salli">Salli (Female)</SelectItem>
-                    <SelectItem value="Kimberly">Kimberly (Female)</SelectItem>
-                    <SelectItem value="Kevin">Kevin (Male)</SelectItem>
-                    <SelectItem value="Amy">Amy (Female, British)</SelectItem>
-                    <SelectItem value="Brian">Brian (Male, British)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="max-w-3xl mx-auto">
+                    <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`inline-block max-w-full ${m.role === "user" ? "bg-emerald-500 text-white px-4 py-3 rounded-lg" : "text-gray-900 dark:text-gray-100"}`}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          className="prose dark:prose-invert max-w-none prose-emerald break-words overflow-hidden"
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a 
+                                {...props} 
+                                className="break-all hover:underline text-blue-600 dark:text-blue-400"
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                              />
+                            ),
+                            p: ({ node, ...props }) => (
+                              <p {...props} className="break-words" />
+                            ),
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {isTyping && (
+                <div className="py-4">
+                  <div className="max-w-3xl mx-auto">
+                    <div className="flex justify-start">
+                      <div className="inline-flex p-4 rounded-md">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-          )}
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-900 dark:text-emerald-500">
-              🎤 Voice Recognition Provider
-            </label>
-            <Select
-              value={voiceRecognitionProvider}
-              onValueChange={(value: VoiceRecognitionProvider) => setVoiceRecognitionProvider(value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select voice recognition provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="webspeech">Web Speech API (Browser-based)</SelectItem>
-                <SelectItem value="awstranscribe">AWS Transcribe (Premium)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-        </div>
-        <span className="text-red-500 text-sm mt-2">
-          ⚠️ Voice input is supported only in the latest versions of Safari and
-          Chrome browsers not supported in Brave.
-        </span>
-        <Button
-          variant="outline"
-          onClick={handleClearChat}
-          className="w-full border-emerald-500 text-gray-900 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-        >
-          Clear Chat
-        </Button>
+          
+          {/* Input area */}
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <div className="max-w-3xl mx-auto">
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <Input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Type your message..."
+                  className="flex-grow bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                />
+                <Dialog open={isVoiceInputOpen} onOpenChange={setIsVoiceInputOpen}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsVoiceInputOpen(true)}
+                    className="border-gray-300 dark:border-gray-700"
+                  >
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Voice Input</DialogTitle>
+                      <DialogDescription>
+                        Speak to add text to your message
+                      </DialogDescription>
+                    </DialogHeader>
+                    {voiceRecognitionProvider === "webspeech" ? (
+                      <AIVoiceInput
+                        onStart={() => setVoiceText("")}
+                        onStop={handleVoiceInput}
+                      />
+                    ) : (
+                      <AwsTranscribeInput
+                        onStart={() => setVoiceText("")}
+                        onStop={handleVoiceInput}
+                      />
+                    )}
+                    <p className="mt-4 text-center text-sm text-gray-500">
+                      {voiceText || "Speak now..."}
+                    </p>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  type="submit"
+                  disabled={isTyping}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                >
+                  Send
+                </Button>
+              </form>
+              <p className="text-xs text-red-500 mt-2">
+                ⚠️ Voice input supported only in latest versions of Safari and Chrome browsers (not in Brave).
+              </p>
+            </div>
+          </div>
+        </main>
       </div>
       
       {/* Delete Chat Confirmation Dialog */}
@@ -836,6 +872,6 @@ export default function ChatComponent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

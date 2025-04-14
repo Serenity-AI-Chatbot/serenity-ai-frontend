@@ -158,6 +158,10 @@ RETURNS TABLE (
     mood_tags TEXT[],
     tags TEXT[],
     keywords TEXT[],
+    song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE,
     similarity FLOAT
 )
@@ -175,6 +179,10 @@ BEGIN
         j.mood_tags,
         j.tags,
         j.keywords,
+        j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at,
         CASE 
             WHEN target_date IS NOT NULL THEN
@@ -428,6 +436,9 @@ RETURNS TABLE (
     tags TEXT[],
     keywords TEXT[],
     song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -443,6 +454,9 @@ BEGIN
         j.tags,
         j.keywords,
         j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at
     FROM journals j
     WHERE j.user_id = get_journals_by_date.p_user_id
@@ -478,6 +492,9 @@ RETURNS TABLE (
     tags TEXT[],
     keywords TEXT[],
     song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -493,6 +510,9 @@ BEGIN
         j.tags,
         j.keywords,
         j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at
     FROM journals j
     WHERE j.user_id = p_user_id
@@ -781,4 +801,82 @@ CREATE POLICY "Users can insert their own mood feedback"
   WITH CHECK (user_id = auth.uid());
 
 -- Grant necessary permissions
-GRANT SELECT, INSERT ON mood_feedback TO authenticated; 
+GRANT SELECT, INSERT ON mood_feedback TO authenticated;
+
+-- Create table for user context
+CREATE TABLE IF NOT EXISTS user_context (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  entity_name TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  information JSONB NOT NULL,
+  relevance_score FLOAT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_user_context_user_id ON user_context(user_id);
+CREATE INDEX idx_user_context_entity_name ON user_context(entity_name);
+CREATE INDEX idx_user_context_entity_type ON user_context(entity_type);
+
+-- Enable RLS
+ALTER TABLE user_context ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view their own context"
+  ON user_context
+  FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own context"
+  ON user_context
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own context"
+  ON user_context
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can delete their own context"
+  ON user_context
+  FOR DELETE
+  USING (user_id = auth.uid());
+
+-- Grant necessary permissions
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_context TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_context TO service_role;
+
+-- Create function to get user context
+CREATE OR REPLACE FUNCTION get_user_context(
+  p_user_id UUID,
+  p_query TEXT DEFAULT NULL
+)
+RETURNS SETOF user_context
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF p_query IS NULL THEN
+    RETURN QUERY
+    SELECT * FROM user_context
+    WHERE user_id = p_user_id
+    ORDER BY updated_at DESC;
+  ELSE
+    RETURN QUERY
+    SELECT * FROM user_context
+    WHERE user_id = p_user_id
+      AND (
+        entity_name ILIKE '%' || p_query || '%' OR
+        entity_type ILIKE '%' || p_query || '%' OR
+        information::text ILIKE '%' || p_query || '%'
+      )
+    ORDER BY updated_at DESC;
+  END IF;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION get_user_context TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_context TO service_role; 

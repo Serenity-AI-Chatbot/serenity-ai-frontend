@@ -430,3 +430,272 @@ For issues, please open a GitHub issue or contact vishalkamboj9211@gmail.com or 
 - [ ] Multi-language support
 - [ ] Advanced machine learning models
 - [ ] Integration with health tracking devices
+
+## Project Architecture
+
+### 1. Frontend Layer
+The frontend is built using Next.js 14 with App Router, providing a modern and performant user interface.
+
+#### Technology Stack:
+- **Framework**: 
+  - Next.js 14 (App Router)
+  - Server Components for improved performance
+  - Client Components for interactivity
+  - API Routes for backend integration
+  - Middleware for authentication and routing
+
+- **Styling**:
+  - Tailwind CSS for utility-first styling
+  - ShadCN/UI components for consistent design
+  - Custom theme configuration
+  - Responsive design patterns
+  - Dark mode support
+
+- **State Management**:
+  - Zustand for global state
+  - React Query for server state
+  - Local storage for persistence
+  - Context API for component-level state
+
+- **Form Handling**:
+  - React Hook Form for form management
+  - Zod for schema validation
+  - Custom form components
+  - Real-time validation
+
+- **Authentication**:
+  - NextAuth.js with Supabase integration
+  - Protected routes
+  - Session management
+  - Role-based access control
+
+#### Key Features:
+- **Journaling Interface**: 
+  - Rich text editor with mood tracking
+  - Daily reflection prompts
+  - Voice-to-text journaling support
+  - AI-powered insights and suggestions
+  - Custom ShadCN/UI components for editor
+
+- **Mood Tracking**:
+  - Visual mood charts and trends
+  - Sentiment analysis of journal entries
+  - Customizable mood categories
+  - Historical mood patterns
+  - Interactive Tailwind-styled charts
+
+- **Wellness Activities**:
+  - Personalized recommendations
+  - Activity scheduling
+  - Progress tracking
+  - Achievement system
+  - ShadCN/UI cards and progress indicators
+
+- **Analytics Dashboard**:
+  - Mood trends visualization
+  - Journaling insights
+  - Wellness activity completion rates
+  - Engagement metrics
+  - Custom Tailwind-styled data visualizations
+
+- **AI Chatbot**:
+  - Emotionally intelligent responses
+  - Context-aware conversations
+  - Multi-turn dialog support
+  - Memory retention
+  - Relationship context awareness
+  - Custom chat interface with ShadCN/UI
+
+- **Zen Mode**:
+  - Distraction-free interface
+  - Ambient sounds and visuals
+  - Guided meditation support
+  - Focus enhancement features
+  - Custom Tailwind animations
+
+- **Voice Interaction**:
+  - AWS Transcribe for speech-to-text
+  - AWS Polly for text-to-speech
+  - Voice-based journaling
+  - Voice chatbot interaction
+  - Custom voice UI components
+
+#### UI Components:
+- **Layout Components**:
+  - Responsive navigation
+  - Sidebar with ShadCN/UI
+  - Header with user controls
+  - Footer with navigation
+
+- **Form Components**:
+  - Custom input fields
+  - Date pickers
+  - File uploaders
+  - Rich text editors
+
+- **Data Display**:
+  - Custom charts and graphs
+  - Data tables
+  - Progress indicators
+  - Status badges
+
+- **Interactive Elements**:
+  - Custom buttons
+  - Dropdown menus
+  - Modal dialogs
+  - Tooltips and popovers
+
+### 2. API Layer (Backend Services)
+The API layer consists of Next.js API routes and a Flask service for sentiment analysis.
+
+#### Technology Stack:
+- **Main API**: Next.js API Routes
+- **Sentiment Analysis**: Flask API
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+
+#### Key Services:
+
+1. **Next.js API Routes**:
+   - **User Management**:
+     - Authentication and authorization
+     - Profile management
+     - Session handling
+   
+   - **Journal Management**:
+     - Entry creation and management
+     - Mood tracking and storage
+     - Content storage and retrieval
+     - Gemini AI integration for insights
+   
+   - **Data Processing**:
+     - Mood trends calculation
+     - Activity tracking
+     - Analytics generation
+     - Dashboard data aggregation
+   
+   - **External Service Integration**:
+     - AWS Transcribe for voice processing
+     - AWS Polly for voice synthesis
+
+2. **Flask API Service**:
+   - **Sentiment Analysis**:
+     - Journal content analysis
+     - Mood detection and classification
+     - Emotion pattern recognition
+     - Sentiment scoring
+   
+   - **Content Recommendations**:
+     - Google Search API integration for article suggestions
+     - Mental health resources discovery
+     - Self-help content recommendations
+     - Educational material suggestions
+   
+   - **Location Services**:
+     - Google Maps API integration
+     - Nearby wellness centers
+     - Parks and relaxation spots
+     - Distance-based filtering
+   
+   - **Music Integration**:
+     - Mood-based song recommendations
+     - Playlist generation
+     - Music therapy suggestions
+     - Genre matching with user preferences
+   
+   - **Integration Flow**:
+     - Next.js API sends journal content to Flask API
+     - Flask service processes content and returns:
+       - Sentiment analysis results
+       - Related articles
+       - Nearby locations
+       - Music recommendations
+     - Results are stored in Supabase via Next.js API
+
+#### Data Flow:
+1. User submits journal entry through Next.js frontend
+2. Next.js API routes handle the request
+3. For content processing:
+   - Content is sent to Flask API
+   - Flask API processes and returns:
+     - Sentiment analysis
+     - Article recommendations
+     - Location suggestions
+     - Music recommendations
+   - Results are stored in Supabase
+4. For other operations:
+   - Next.js API directly interacts with Supabase
+   - Handles Gemini AI integration
+   - Manages AWS services (Transcribe, Polly)
+
+### 3. Database Layer
+A structured data storage system ensures security, scalability, and high availability.
+
+#### Data Structure:
+- **User Data**:
+  - Profiles
+  - Preferences
+  - Authentication tokens
+  - Relationship information
+
+- **Content Data**:
+  - Journal entries
+  - Mood logs
+  - Activity records
+  - Chat history
+  - Vector embeddings
+
+- **Analytics Data**:
+  - Usage statistics
+  - Engagement metrics
+  - Progress tracking
+  - Performance data
+
+#### Security Features:
+- Row Level Security (RLS)
+- Data encryption
+- Access control policies
+- GDPR compliance measures
+
+### 4. AI & Machine Learning Layer
+AI processing is central to Serenity AI's ability to understand user emotions and provide meaningful suggestions.
+
+#### Components:
+- **Natural Language Processing**:
+  - Gemini AI for text analysis
+  - SpaCy for entity recognition
+  - NLTK for text processing
+  - Sentiment detection
+  - Context understanding
+
+- **Voice Processing**:
+  - AWS Transcribe for speech-to-text
+  - AWS Polly for text-to-speech
+  - Voice command processing
+  - Emotional voice synthesis
+
+- **Personalization**:
+  - User behavior analysis
+  - Recommendation engine
+  - Activity scheduling
+  - Relationship context learning
+
+### 5. External API Integrations
+To enhance personalization and contextual recommendations, Serenity AI integrates third-party APIs:
+
+#### Key Integrations:
+- **Google Services**:
+  - Maps API for location-based features
+  - Search API for content discovery
+  - Gemini AI for advanced NLP
+
+- **AWS Services**:
+  - Transcribe for voice input
+  - Polly for voice output
+  - EC2 for ML model deployment
+
+#### Integration Features:
+- Location-based recommendations
+- Content discovery and suggestions
+- Voice interaction capabilities
+- ML model deployment and scaling

@@ -1,49 +1,62 @@
 import { supabase } from "@/lib/supabase-server";
-import { format, parse } from 'date-fns';
+import { format, parse } from "date-fns";
 import { generateEmbedding } from "./client";
-import { JournalEntry, JournalQueryResult, MoodAnalysis, datePatterns } from "./types";
+import {
+  JournalEntry,
+  JournalQueryResult,
+  MoodAnalysis,
+  datePatterns,
+} from "./types";
 import { analyzeMoodPatterns } from "./mood-analysis";
+import {
+  combinedFunctionCalling,
+  processUserContextItems,
+} from "./user-context-function-calling";
 
-export async function fetchRelevantJournalEntries(userId: string, userMessage: string): Promise<JournalQueryResult> {
-  const queryEmbedding = await generateEmbedding(userMessage);
-
+export async function fetchRelevantJournalEntries(
+  userId: string,
+  userMessage: string
+): Promise<JournalQueryResult> {
   try {
-    // Check for date range pattern first
-    const dateRangeMatch = userMessage.match(datePatterns.dateRange);
-    if (dateRangeMatch) {
-      const result = await fetchJournalsByDateRange(userId, dateRangeMatch);
-      return {
-        entries: Array.isArray(result) ? result : [],
-        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-        recommendations: [],
-      };
+    // Use a single AI call to handle both user context extraction and journal query method
+    const combinedResult = await combinedFunctionCalling(userId, userMessage);
+    console.log("Combined AI function calling result:", combinedResult);
+
+    // Process any extracted user context
+    if (combinedResult.userContext && combinedResult.userContext.length > 0) {
+      await processUserContextItems(userId, combinedResult.userContext);
     }
 
-    const monthYearMatch = userMessage.match(datePatterns.monthYear);
-    if (monthYearMatch) {
-      const result = await fetchJournalsByMonthYear(userId, monthYearMatch);
-      return {
-        entries: Array.isArray(result) ? result : [],
-        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-        recommendations: [],
-      };
+    // Get journal query method from combined result
+    const journalQueryMethod = combinedResult.journalQuery || {
+      name: "fetch_recent",
+      args: { limit: 10 },
+    };
+    console.log("AI determined journal query method:", journalQueryMethod);
+
+    let entries: JournalEntry[] = [];
+
+    // Based on the function call returned, fetch the appropriate journals
+    if (journalQueryMethod.name === "fetch_by_date_range") {
+      const { startDate, endDate } = journalQueryMethod.args;
+      entries = await fetchJournalsByDateRange(userId, startDate, endDate);
+    } else if (journalQueryMethod.name === "fetch_by_month_year") {
+      const { month, year } = journalQueryMethod.args;
+      entries = await fetchJournalsByMonthYear(userId, month, year);
+    } else if (journalQueryMethod.name === "fetch_by_specific_date") {
+      const { date } = journalQueryMethod.args;
+      const queryEmbedding = await generateEmbedding(userMessage);
+      entries = await fetchJournalsBySpecificDate(userId, date, queryEmbedding);
+    } else if (journalQueryMethod.name === "fetch_by_semantic_search") {
+      const queryEmbedding = await generateEmbedding(userMessage);
+      entries = await fetchJournalsBySemantic(userId, queryEmbedding);
+    } else {
+      // Default to fetching latest journals
+      entries = await fetchLastTenJournals(userId);
     }
 
-    const dateMatch = userMessage.match(datePatterns.specificDate);
-    
-    if (dateMatch) {
-      const result = await fetchJournalsByDateOrSemantic(userId, dateMatch, queryEmbedding);
-      return {
-        entries: Array.isArray(result) ? result : [],
-        moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
-        recommendations: [],
-      };
-    }
-
-    // If no date is found, fetch the last 10 journals
-    const lastTenJournals = await fetchLastTenJournals(userId);
     return {
-      entries: Array.isArray(lastTenJournals) ? lastTenJournals : [],
+      entries: Array.isArray(entries) ? entries : [],
       moodAnalysis: await analyzeMoodPatterns(userId, userMessage),
       recommendations: [],
     };
@@ -57,7 +70,9 @@ export async function fetchRelevantJournalEntries(userId: string, userMessage: s
   }
 }
 
-export async function fetchLastTenJournals(userId: string): Promise<JournalEntry[]> {
+export async function fetchLastTenJournals(
+  userId: string
+): Promise<JournalEntry[]> {
   const { data, error } = await supabase
     .from("journals")
     .select("*")
@@ -72,7 +87,10 @@ export async function fetchLastTenJournals(userId: string): Promise<JournalEntry
   return data;
 }
 
-export async function fetchLatestJournals(userId: string, limit: number): Promise<JournalEntry[]> {
+export async function fetchLatestJournals(
+  userId: string,
+  limit: number
+): Promise<JournalEntry[]> {
   const { data, error } = await supabase
     .from("journals")
     .select("*")
@@ -87,63 +105,84 @@ export async function fetchLatestJournals(userId: string, limit: number): Promis
   return data;
 }
 
-export async function fetchJournalsByMonthYear(userId: string, match: RegExpMatchArray): Promise<JournalEntry[]> {
-  const [monthStr, yearStr] = [match[1], match[2]];
-  const targetMonth = monthStr ? new Date(`${monthStr} 1, 2000`).getMonth() + 1 : null;
-  const targetYear = yearStr ? parseInt(yearStr) : null;
-
+export async function fetchJournalsByMonthYear(
+  userId: string,
+  month?: number,
+  year?: number
+): Promise<JournalEntry[]> {
   console.log("Monthly/Yearly journal query:");
-  console.log("monthStr:", monthStr);
-  console.log("yearStr:", yearStr);
-  console.log("targetMonth:", targetMonth);
-  console.log("targetYear:", targetYear);
+  console.log("month:", month);
+  console.log("year:", year);
 
-  const response = await supabase.rpc('get_journals_by_date', {
+  const response = await supabase.rpc("get_journals_by_date", {
     p_user_id: userId,
-    p_year: targetYear,
-    p_month: targetMonth
+    p_year: year || null,
+    p_month: month || null,
   });
 
   if (response.error) throw response.error;
   return response.data;
 }
 
-export async function fetchJournalsByDateOrSemantic(
-  userId: string, 
-  dateMatch: RegExpMatchArray | null, 
+export async function fetchJournalsBySpecificDate(
+  userId: string,
+  dateStr: string,
   queryEmbedding: number[]
 ): Promise<JournalEntry[]> {
-  let targetDate: string | null = null;
-  
-  if (dateMatch) {
-    const dateStr = dateMatch[1].trim();
-    const parsedDate = parse(dateStr, 'EEEE, MMMM d, yyyy', new Date());
-    targetDate = format(parsedDate, 'yyyy-MM-dd');
+  try {
+    const parsedDate = parse(dateStr, "MMMM d, yyyy", new Date());
+    const targetDate = format(parsedDate, "yyyy-MM-dd");
+
     console.log("Specific date journal query:");
     console.log("dateStr:", dateStr);
     console.log("parsedDate:", parsedDate);
     console.log("targetDate:", targetDate);
-  }
 
-  const response = await supabase.rpc('match_journals', {
+    const response = await supabase.rpc("match_journals", {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: 5,
+      user_id: userId,
+      target_date: targetDate,
+    });
+
+    if (response.error) throw response.error;
+    return response.data;
+  } catch (error) {
+    console.error("Error parsing date:", error);
+    // If date parsing fails, fall back to semantic search
+    return fetchJournalsBySemantic(userId, queryEmbedding);
+  }
+}
+
+export async function fetchJournalsBySemantic(
+  userId: string,
+  queryEmbedding: number[]
+): Promise<JournalEntry[]> {
+  console.log("Semantic journal query");
+
+  const response = await supabase.rpc("match_journals", {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,
     match_count: 5,
     user_id: userId,
-    target_date: targetDate
+    target_date: null,
   });
+
+  console.log("Semantic journal query response:", response);
 
   if (response.error) throw response.error;
   return response.data;
 }
 
-export async function fetchJournalsByDateRange(userId: string, match: RegExpMatchArray): Promise<JournalEntry[]> {
-  const startDateStr = match[1].trim();
-  const endDateStr = match[2].trim();
-  
+export async function fetchJournalsByDateRange(
+  userId: string,
+  startDateStr: string,
+  endDateStr: string
+): Promise<JournalEntry[]> {
   try {
-    const startDate = parse(startDateStr, 'MMMM d, yyyy', new Date());
-    const endDate = parse(endDateStr, 'MMMM d, yyyy', new Date());
+    const startDate = parse(startDateStr, "MMMM d, yyyy", new Date());
+    const endDate = parse(endDateStr, "MMMM d, yyyy", new Date());
 
     console.log("Date range journal query:");
     console.log("startDateStr:", startDateStr);
@@ -151,10 +190,10 @@ export async function fetchJournalsByDateRange(userId: string, match: RegExpMatc
     console.log("startDate:", startDate);
     console.log("endDate:", endDate);
 
-    const { data, error } = await supabase.rpc('get_journal_stats_by_period', {
+    const { data, error } = await supabase.rpc("get_journal_stats_by_period", {
       p_user_id: userId,
-      p_start_date: format(startDate, 'yyyy-MM-dd'),
-      p_end_date: format(endDate, 'yyyy-MM-dd')
+      p_start_date: format(startDate, "yyyy-MM-dd"),
+      p_end_date: format(endDate, "yyyy-MM-dd"),
     });
 
     if (error) throw error;
@@ -165,16 +204,17 @@ export async function fetchJournalsByDateRange(userId: string, match: RegExpMatc
       ...entry,
       mood_tags: entry.mood_tags || [],
       tags: entry.tags || [],
-      keywords: entry.keywords || []
+      keywords: entry.keywords || [],
     }));
-
   } catch (error) {
     console.error("Error fetching date range:", error);
     throw error;
   }
 }
 
-export function formatJournalEntries(entries: JournalEntry[] | null | undefined): string {
+export function formatJournalEntries(
+  entries: JournalEntry[] | null | undefined
+): string {
   // Check if entries exists and is an array
   if (!entries || !Array.isArray(entries)) {
     console.log("No entries found or invalid entries format:", entries);
@@ -187,15 +227,64 @@ export function formatJournalEntries(entries: JournalEntry[] | null | undefined)
   }
 
   const formattedEntries = entries
-    .map(entry => `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
-    Title: ${entry.title || 'Untitled'}
-    Content: ${entry.content || 'No content'}
-    Summary: ${entry.summary || 'No summary'}
-    Mood Tags: ${(entry.mood_tags || []).join(", ") || 'No mood tags'}
-    Tags: ${(entry.tags || []).join(", ") || 'No tags'}
-    Keywords: ${(entry.keywords || []).join(", ") || 'No keywords'}
-    Song: ${entry.song || 'No song'}`)
+    .map(
+      (entry) => {
+        // Format the basic entry info
+        let formatted = `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
+    Title: ${entry.title || "Untitled"}
+    Content: ${entry.content || "No content"}
+    Summary: ${entry.summary || "No summary"}
+    Mood Tags: ${(entry.mood_tags || []).join(", ") || "No mood tags"}
+    Tags: ${(entry.tags || []).join(", ") || "No tags"}
+    Keywords: ${(entry.keywords || []).join(", ") || "No keywords"}
+    Song: ${entry.song || "No song"}`;
+
+        // Add nearby places if available
+        if (entry.nearby_places && Object.keys(entry.nearby_places).length > 0) {
+          formatted += `\n    Nearby Places: ${formatJSONB(entry.nearby_places)}`;
+        }
+
+        // Add latest articles if available
+        if (entry.latest_articles && Object.keys(entry.latest_articles).length > 0) {
+          formatted += `\n    Related Articles: ${formatJSONB(entry.latest_articles)}`;
+        }
+
+        return formatted;
+      }
+    )
     .join("\n\n");
 
   return formattedEntries;
-} 
+}
+
+// Helper function to format JSONB data for display
+function formatJSONB(data: Record<string, any>): string {
+  try {
+    if (!data || typeof data !== 'object') return 'None';
+    
+    // For array data
+    if (Array.isArray(data)) {
+      return data.map(item => {
+        if (typeof item === 'object') {
+          return Object.entries(item)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+        }
+        return String(item);
+      }).join('; ');
+    }
+    
+    // For object data
+    return Object.entries(data)
+      .map(([key, value]) => {
+        if (typeof value === 'object' && value !== null) {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${value}`;
+      })
+      .join(', ');
+  } catch (e) {
+    console.error("Error formatting JSONB:", e);
+    return 'Error formatting data';
+  }
+}
