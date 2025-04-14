@@ -153,7 +153,7 @@ export default function TelegramSettings() {
             <div className="text-sm text-muted-foreground mt-2">
               <p>To find your Telegram ID:</p>
               <ol className="list-decimal list-inside space-y-1 mt-1">
-                <li>Chat with <span className="font-medium">@SerenityAIBot</span> on Telegram</li>
+                <li>Chat with <span className="font-medium">@sernity_ai_bot</span> on Telegram</li>
                 <li>Send the command <code className="bg-muted px-1 rounded">/myid</code></li>
                 <li>Copy the ID number and paste it here</li>
               </ol>
