@@ -191,7 +191,7 @@ export function JournalDetail({ journal }: JournalDetailProps) {
                     <h3 className="font-medium text-gray-900">{place.name}</h3>
                     <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
                       <span>
-                        ⭐ {place.rating.toFixed(1)} ({place.user_ratings_total}{" "}
+                        ⭐ {place.rating ? place.rating.toFixed(1) : 'N/A'} ({place.user_ratings_total || 0}{" "}
                         reviews)
                       </span>
                     </div>
