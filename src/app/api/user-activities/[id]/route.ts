@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     console.log(`Processing PATCH request for activity ID: ${id}`);
 
     const { session } = await requireAuth()
