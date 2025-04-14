@@ -607,7 +607,20 @@ export default function ZenChat({ chatId }: { chatId: string }) {
                       message.role === "user" 
                         ? "prose-emerald dark:prose-invert" 
                         : "prose-gray dark:prose-invert"
-                    }`}
+                    } break-words overflow-hidden`}
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a 
+                          {...props} 
+                          className="break-all hover:underline text-blue-600 dark:text-blue-400"
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        />
+                      ),
+                      p: ({ node, ...props }) => (
+                        <p {...props} className="break-words" />
+                      ),
+                    }}
                   >
                     {message.content}
                   </ReactMarkdown>
