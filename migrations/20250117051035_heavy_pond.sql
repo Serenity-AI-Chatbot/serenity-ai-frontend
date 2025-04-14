@@ -158,6 +158,10 @@ RETURNS TABLE (
     mood_tags TEXT[],
     tags TEXT[],
     keywords TEXT[],
+    song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE,
     similarity FLOAT
 )
@@ -175,6 +179,10 @@ BEGIN
         j.mood_tags,
         j.tags,
         j.keywords,
+        j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at,
         CASE 
             WHEN target_date IS NOT NULL THEN
@@ -428,6 +436,9 @@ RETURNS TABLE (
     tags TEXT[],
     keywords TEXT[],
     song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -443,6 +454,9 @@ BEGIN
         j.tags,
         j.keywords,
         j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at
     FROM journals j
     WHERE j.user_id = get_journals_by_date.p_user_id
@@ -478,6 +492,9 @@ RETURNS TABLE (
     tags TEXT[],
     keywords TEXT[],
     song TEXT,
+    latest_articles JSONB,
+    nearby_places JSONB,
+    sentences TEXT[],
     created_at TIMESTAMP WITH TIME ZONE
 ) LANGUAGE plpgsql
 STABLE
@@ -493,6 +510,9 @@ BEGIN
         j.tags,
         j.keywords,
         j.song,
+        j.latest_articles,
+        j.nearby_places,
+        j.sentences,
         j.created_at
     FROM journals j
     WHERE j.user_id = p_user_id

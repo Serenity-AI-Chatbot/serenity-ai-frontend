@@ -228,18 +228,63 @@ export function formatJournalEntries(
 
   const formattedEntries = entries
     .map(
-      (entry) => `Journal Entry (${new Date(
-        entry.created_at
-      ).toLocaleDateString()}):
+      (entry) => {
+        // Format the basic entry info
+        let formatted = `Journal Entry (${new Date(entry.created_at).toLocaleDateString()}):
     Title: ${entry.title || "Untitled"}
     Content: ${entry.content || "No content"}
     Summary: ${entry.summary || "No summary"}
     Mood Tags: ${(entry.mood_tags || []).join(", ") || "No mood tags"}
     Tags: ${(entry.tags || []).join(", ") || "No tags"}
     Keywords: ${(entry.keywords || []).join(", ") || "No keywords"}
-    Song: ${entry.song || "No song"}`
+    Song: ${entry.song || "No song"}`;
+
+        // Add nearby places if available
+        if (entry.nearby_places && Object.keys(entry.nearby_places).length > 0) {
+          formatted += `\n    Nearby Places: ${formatJSONB(entry.nearby_places)}`;
+        }
+
+        // Add latest articles if available
+        if (entry.latest_articles && Object.keys(entry.latest_articles).length > 0) {
+          formatted += `\n    Related Articles: ${formatJSONB(entry.latest_articles)}`;
+        }
+
+        return formatted;
+      }
     )
     .join("\n\n");
 
   return formattedEntries;
+}
+
+// Helper function to format JSONB data for display
+function formatJSONB(data: Record<string, any>): string {
+  try {
+    if (!data || typeof data !== 'object') return 'None';
+    
+    // For array data
+    if (Array.isArray(data)) {
+      return data.map(item => {
+        if (typeof item === 'object') {
+          return Object.entries(item)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+        }
+        return String(item);
+      }).join('; ');
+    }
+    
+    // For object data
+    return Object.entries(data)
+      .map(([key, value]) => {
+        if (typeof value === 'object' && value !== null) {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${value}`;
+      })
+      .join(', ');
+  } catch (e) {
+    console.error("Error formatting JSONB:", e);
+    return 'Error formatting data';
+  }
 }

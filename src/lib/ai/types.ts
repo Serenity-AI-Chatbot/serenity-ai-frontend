@@ -22,6 +22,10 @@ export interface JournalEntry {
   keywords: string[];
   created_at: string;
   similarity?: number;
+  latest_articles?: Record<string, any>;
+  nearby_places?: Record<string, any>;
+  sentences?: string[];
+  user_id?: string;
 }
 
 export interface JournalStats {
