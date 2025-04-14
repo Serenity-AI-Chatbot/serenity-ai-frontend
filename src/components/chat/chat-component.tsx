@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mic, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Mic, Plus, Sparkles, Trash2, Menu, X, Settings, MessageSquare, MoreVertical, List } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,22 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AIVoiceInput } from "@/components/journal/ai-voice-input";
 import { AwsTranscribeInput } from "@/components/journal/aws-transcribe-input";
@@ -99,6 +115,10 @@ export default function ChatComponent() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
   const { toast } = useToast();
+  const [isChatListOpen, setIsChatListOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -533,10 +553,12 @@ export default function ChatComponent() {
   return (
     <div className="flex flex-col h-screen w-full bg-white dark:bg-gray-900">
       {/* Header */}
-      <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm py-3 px-6">
+      <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm py-3 px-4 sm:px-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Serenity AI</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Serenity AI</h1>
+          </div>
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -546,7 +568,7 @@ export default function ChatComponent() {
                 }
               }}
               disabled={!currentChatId}
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hidden sm:flex"
             >
               <Sparkles className="h-4 w-4 mr-1" />
               Zen Mode
@@ -555,7 +577,7 @@ export default function ChatComponent() {
               variant="ghost"
               size="sm"
               onClick={handleNewChat}
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-1" />
               New Chat
@@ -565,11 +587,69 @@ export default function ChatComponent() {
               size="sm"
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={!currentChatId}
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hidden sm:flex"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Delete Chat
             </Button>
+            
+            {/* Add visible settings button for mobile */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSettingsOpen(true)}
+              className="md:hidden"
+            >
+              <Settings className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+            </Button>
+            
+            {/* Mobile dropdown menu */}
+            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <DropdownMenuTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Menu</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsChatListOpen(true)}>
+                  <List className="h-4 w-4 mr-2" />
+                  Chats
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={handleNewChat}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Chat
+                </DropdownMenuItem>
+                
+                {currentChatId && (
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      window.location.href = `/chat/zen/${currentChatId}`;
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Zen Mode
+                  </DropdownMenuItem>
+                )}
+                
+                <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+                
+                {currentChatId && (
+                  <DropdownMenuItem 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-red-600 dark:text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Chat
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -599,6 +679,7 @@ export default function ChatComponent() {
                       : "hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}
                 >
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate">{chat.title}</span>
                 </button>
               ))}
@@ -646,7 +727,7 @@ export default function ChatComponent() {
                       <SelectContent>
                         <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
                         <SelectItem value="awspolly">AWS Polly (Premium)</SelectItem>
-                        <SelectItem value="elevenlabs">ElevenLabs (Limited Credit)</SelectItem>
+                        <SelectItem value="elevenlabs">ElevenLabs (Limited)</SelectItem>
                       </SelectContent>
                     </Select>
                     
@@ -664,8 +745,8 @@ export default function ChatComponent() {
                           <SelectItem value="Salli">Salli (Female)</SelectItem>
                           <SelectItem value="Kimberly">Kimberly (Female)</SelectItem>
                           <SelectItem value="Kevin">Kevin (Male)</SelectItem>
-                          <SelectItem value="Amy">Amy (Female, British)</SelectItem>
-                          <SelectItem value="Brian">Brian (Male, British)</SelectItem>
+                          <SelectItem value="Amy">Amy (British)</SelectItem>
+                          <SelectItem value="Brian">Brian (British)</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -705,23 +786,23 @@ export default function ChatComponent() {
         {/* Main chat area */}
         <main className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
           {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4" ref={scrollAreaRef}>
-            <div className="max-w-3xl mx-auto space-y-6">
+          <ScrollArea className="flex-1 p-4">
+            <div className="max-w-3xl mx-auto space-y-6 pb-20 sm:pb-4">
               {messages.length === 0 && (
-                <div className="text-center py-20">
-                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Welcome to Serenity-AI</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                <div className="text-center py-10 sm:py-20">
+                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-4">Welcome to Serenity-AI</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto px-4">
                     I'm here to support your mental well-being. Feel free to ask me anything or try one of the suggested prompts below.
                   </p>
                   
-                  <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="flex flex-wrap gap-2 justify-center px-4">
                     {SUGGESTED_PROMPTS.map((prompt, index) => (
                       <Button
                         key={index}
                         variant="outline"
                         size="sm"
                         onClick={() => handleSuggestedPrompt(prompt)}
-                        className="border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs sm:text-sm"
                       >
                         {prompt}
                       </Button>
@@ -734,15 +815,21 @@ export default function ChatComponent() {
                 <div
                   key={index}
                   className={`${
-                    m.role === "assistant" ? "bg-gray-50 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 py-8" : "py-4"
+                    m.role === "assistant" ? "bg-gray-50 dark:bg-gray-800/50 border-y border-gray-100 dark:border-gray-800 py-4 sm:py-8 -mx-4 px-4" : "py-2 sm:py-4"
                   }`}
                 >
                   <div className="max-w-3xl mx-auto">
                     <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div className={`inline-block max-w-full ${m.role === "user" ? "bg-emerald-500 text-white px-4 py-3 rounded-lg" : "text-gray-900 dark:text-gray-100"}`}>
+                      <div 
+                        className={`
+                          ${m.role === "user" 
+                            ? "bg-emerald-500 text-white rounded-lg px-4 py-3 max-w-[85%] sm:max-w-[75%]" 
+                            : "text-gray-900 dark:text-gray-100 max-w-full"}
+                        `}
+                      >
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
-                          className="prose dark:prose-invert max-w-none prose-emerald break-words overflow-hidden"
+                          className="prose dark:prose-invert max-w-none prose-emerald break-words overflow-hidden prose-sm sm:prose"
                           components={{
                             a: ({ node, ...props }) => (
                               <a 
@@ -753,7 +840,7 @@ export default function ChatComponent() {
                               />
                             ),
                             p: ({ node, ...props }) => (
-                              <p {...props} className="break-words" />
+                              <p {...props} className="break-words whitespace-pre-wrap" />
                             ),
                           }}
                         >
@@ -777,12 +864,21 @@ export default function ChatComponent() {
                 </div>
               )}
             </div>
-          </div>
+          </ScrollArea>
           
           {/* Input area */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky bottom-0 w-full">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={handleSubmit} className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="md:hidden border-gray-300 dark:border-gray-700"
+                >
+                  <Menu className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+                </Button>
                 <Input
                   value={input}
                   onChange={handleInputChange}
@@ -838,6 +934,145 @@ export default function ChatComponent() {
         </main>
       </div>
       
+      {/* Bottom Sheet for Chat List (Mobile) */}
+      <Sheet open={isChatListOpen} onOpenChange={setIsChatListOpen}>
+        <SheetContent side="bottom" className="h-[80vh] rounded-t-xl">
+          <SheetHeader className="text-left border-b border-gray-200 dark:border-gray-800 pb-4">
+            <SheetTitle>Your Conversations</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(80vh-10rem)] pt-4">
+            <div className="space-y-1 px-1">
+              {chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => {
+                    handleSelectChat(chat.id);
+                    setIsChatListOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 ${
+                    currentChatId === chat.id 
+                    ? "bg-gray-100 dark:bg-gray-800" 
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  }`}
+                >
+                  <MessageSquare className="h-5 w-5 flex-shrink-0 text-emerald-500" />
+                  <div className="flex-1 overflow-hidden">
+                    <p className="font-medium truncate">{chat.title}</p>
+                    <p className="text-xs text-gray-500 truncate mt-1">
+                      {chat.last_message || "Start a new conversation"}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500">{formatDate(chat.updated_at)}</p>
+                </button>
+              ))}
+              {chats.length === 0 && !isLoadingChats && (
+                <div className="text-center py-10">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No conversations yet
+                  </p>
+                </div>
+              )}
+              {isLoadingChats && (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <SheetFooter className="flex-col border-t border-gray-200 dark:border-gray-800 pt-4 mt-auto">
+            <Button 
+              onClick={() => {
+                handleNewChat();
+                setIsChatListOpen(false);
+              }}
+              className="w-full bg-emerald-500 hover:bg-emerald-600"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Chat
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+      
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Menu Options</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              onClick={() => {
+                setIsChatListOpen(true);
+                setIsSettingsOpen(false);
+              }}
+              className="w-full justify-start"
+              variant="outline"
+            >
+              <List className="h-4 w-4 mr-2" />
+              Change Chats
+            </Button>
+            
+            {currentChatId && (
+              <Button 
+                onClick={() => {
+                  window.location.href = `/chat/zen/${currentChatId}`;
+                }}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Zen Mode
+              </Button>
+            )}
+            
+            <Button 
+              onClick={handleNewChat}
+              className="w-full justify-start"
+              variant="outline"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Chat
+            </Button>
+            
+            <Button 
+              onClick={() => {
+                const originalDialog = isSettingsOpen;
+                setIsSettingsOpen(false);
+                // Small delay to avoid dialog conflicts
+                setTimeout(() => {
+                  setIsDeleteDialogOpen(true);
+                }, 100);
+              }}
+              className="w-full justify-start text-red-600 dark:text-red-500"
+              variant="outline"
+              disabled={!currentChatId}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Chat
+            </Button>
+            
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+              <Button 
+                onClick={() => {
+                  const originalDialog = isSettingsOpen;
+                  setIsSettingsOpen(false);
+                  // Small delay to avoid dialog conflicts
+                  setTimeout(() => {
+                    setIsVoiceSettingsOpen(true);
+                  }, 100);
+                }}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Voice Settings
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       {/* Delete Chat Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
@@ -847,7 +1082,7 @@ export default function ChatComponent() {
               Are you sure you want to delete this chat? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex justify-between">
+          <DialogFooter className="flex justify-between sm:justify-end">
             <Button 
               variant="outline" 
               onClick={() => setIsDeleteDialogOpen(false)}
@@ -859,6 +1094,7 @@ export default function ChatComponent() {
               variant="destructive" 
               onClick={deleteChat}
               disabled={isDeleting}
+              className="ml-2"
             >
               {isDeleting ? (
                 <>
@@ -870,6 +1106,107 @@ export default function ChatComponent() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Voice Settings Dialog */}
+      <Dialog open={isVoiceSettingsOpen} onOpenChange={setIsVoiceSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Voice & Settings</DialogTitle>
+            <DialogDescription>
+              Configure your voice and chat preferences
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="mobile-voice-response"
+                  checked={isVoiceResponseEnabled}
+                  onCheckedChange={(checked) =>
+                    setIsVoiceResponseEnabled(checked as boolean)
+                  }
+                  className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+                />
+                <label
+                  htmlFor="mobile-voice-response"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-900 dark:text-gray-300"
+                >
+                  🔈 Enable AI voice
+                </label>
+              </div>
+              
+              {isVoiceResponseEnabled && (
+                <div className="space-y-2 mt-3">
+                  <Select
+                    value={voiceProvider}
+                    onValueChange={(value: VoiceProvider) => setVoiceProvider(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select voice provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webspeech">Web Speech API (Free)</SelectItem>
+                      <SelectItem value="awspolly">AWS Polly (Premium)</SelectItem>
+                      <SelectItem value="elevenlabs">ElevenLabs (Limited)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {voiceProvider === "awspolly" && (
+                    <Select
+                      value={pollyVoice}
+                      onValueChange={(value) => setPollyVoice(value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select AWS Polly voice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Joanna">Joanna (Female)</SelectItem>
+                        <SelectItem value="Matthew">Matthew (Male)</SelectItem>
+                        <SelectItem value="Salli">Salli (Female)</SelectItem>
+                        <SelectItem value="Kimberly">Kimberly (Female)</SelectItem>
+                        <SelectItem value="Kevin">Kevin (Male)</SelectItem>
+                        <SelectItem value="Amy">Amy (British)</SelectItem>
+                        <SelectItem value="Brian">Brian (British)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+              
+              <div className="pt-3">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-300 block mb-1">
+                  🎤 Voice Recognition
+                </label>
+                <Select
+                  value={voiceRecognitionProvider}
+                  onValueChange={(value: VoiceRecognitionProvider) => setVoiceRecognitionProvider(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select voice recognition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="webspeech">Web Speech API</SelectItem>
+                    <SelectItem value="awstranscribe">AWS Transcribe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="pt-4">
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  handleClearChat();
+                  setIsVoiceSettingsOpen(false);
+                }}
+                className="w-full border-gray-300 dark:border-gray-700"
+              >
+                Clear Chat
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

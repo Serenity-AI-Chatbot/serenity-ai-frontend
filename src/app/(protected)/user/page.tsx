@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { UserContextItem } from '@/lib/ai/types';
 import UserContextList from '@/components/user/user-context-list';
 import UserContextForm from '@/components/user/user-context-form';
+import TelegramSettings from '@/components/user/telegram-settings';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ export default function UserContextPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<UserContextItem | null>(null);
   const [activeTab, setActiveTab] = useState('list');
+  const [activeSectionTab, setActiveSectionTab] = useState('context');
 
   // Fetch user contexts on component mount
   useEffect(() => {
@@ -81,33 +83,11 @@ export default function UserContextPage() {
     setSelectedItem(null);
   };
 
-  return (
-    <div className="container mx-auto py-8 px-4 max-w-5xl">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold mb-3 text-emerald-600">Your Personal Context</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          This information helps Serenity AI understand you better and provide more personalized responses. 
-          Add details about people, places, or preferences important to you.
-        </p>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 w-full bg-emerald-50 p-1">
-          <TabsTrigger 
-            value="list" 
-            className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            All Information
-          </TabsTrigger>
-          <TabsTrigger 
-            value="edit" 
-            className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            {selectedItem ? 'Edit Information' : 'Add Information'}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="mt-0">
+  // Render the personal context tab content
+  const renderPersonalContextTab = () => {
+    if (activeTab === 'list') {
+      return (
+        <>
           <div className="flex justify-end mb-6">
             <Button 
               onClick={handleAddNew} 
@@ -147,14 +127,77 @@ export default function UserContextPage() {
               onDelete={handleDeleteItem} 
             />
           )}
+        </>
+      );
+    } else {
+      return (
+        <UserContextForm 
+          initialData={selectedItem}
+          onSave={handleSaveComplete}
+          onCancel={handleCancel}
+        />
+      );
+    }
+  };
+
+  return (
+    <div className="container mx-auto py-8 px-4 max-w-5xl">
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold mb-3 text-emerald-600">Your Profile Settings</h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Manage your personal information and connect with external services to enhance your Serenity AI experience.
+        </p>
+      </div>
+
+      <Tabs value={activeSectionTab} onValueChange={setActiveSectionTab} className="w-full">
+        <TabsList className="mb-6 w-full bg-emerald-50 p-1">
+          <TabsTrigger 
+            value="context" 
+            className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+          >
+            Personal Context
+          </TabsTrigger>
+          <TabsTrigger 
+            value="integrations" 
+            className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+          >
+            Integrations
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="context" className="mt-0">
+          <div className="mb-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full bg-emerald-50 p-1">
+                <TabsTrigger 
+                  value="list" 
+                  className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                >
+                  All Information
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="edit" 
+                  className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                >
+                  {selectedItem ? 'Edit Information' : 'Add Information'}
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="list">
+                {renderPersonalContextTab()}
+              </TabsContent>
+              
+              <TabsContent value="edit">
+                {renderPersonalContextTab()}
+              </TabsContent>
+            </Tabs>
+          </div>
         </TabsContent>
 
-        <TabsContent value="edit" className="mt-0">
-          <UserContextForm 
-            initialData={selectedItem}
-            onSave={handleSaveComplete}
-            onCancel={handleCancel}
-          />
+        <TabsContent value="integrations" className="mt-0">
+          <div className="space-y-8">
+            <TelegramSettings />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
