@@ -7,6 +7,7 @@ import { fetchActivities } from "@/lib/ai/activities";
 import { formatJournalEntries } from "@/lib/ai/journals";
 import { formatActivities } from "@/lib/ai/activities";
 import { prepareChatMessages, handleError } from "@/lib/ai/chat";
+import { fetchRelevantUserContext, formatUserContext } from "@/lib/ai/user-context";
 
 // Set the runtime to edge for better performance
 export const runtime = "edge";
@@ -157,30 +158,49 @@ async function processUpdate(data: any) {
           { role: "user", content: userMessage }
         ];
 
-        // Get journal entries based on user message
+        console.log("Telegram webhook: Fetching relevant journal entries and extracting user context");
+        // Get journal entries based on user message 
+        // Note: This now also handles user context extraction internally
         const { entries, moodAnalysis, recommendations } = await fetchRelevantJournalEntries(userId, userMessage);
+        console.log(`Telegram webhook: Found ${entries.length} relevant journal entries`);
+        console.log("Telegram webhook: Mood analysis:", JSON.stringify(moodAnalysis).substring(0, 200) + "...");
         
         // Fetch and format activities
+        console.log("Telegram webhook: Fetching activities");
         const activities = await fetchActivities();
+        console.log(`Telegram webhook: Found ${activities.length} activities`);
+
+        // Fetch relevant user context (including any newly extracted context from the journal entries function)
+        console.log("Telegram webhook: Fetching relevant user context");
+        const userContextItems = await fetchRelevantUserContext(userId, userMessage);
+        console.log(`Telegram webhook: Found ${userContextItems.length} user context items:`, 
+          userContextItems.map(item => item.entity_name).join(", "));
 
         // Format contexts
+        console.log("Telegram webhook: Formatting contexts for AI input");
         const journalContext = formatJournalEntries(entries);
         const activitiesContext = formatActivities(activities);
+        const userContext = formatUserContext(userContextItems);
 
         // Prepare chat message
+        console.log("Telegram webhook: Preparing Gemini messages with context");
         const geminiMessages = prepareChatMessages(
           messages, 
           journalContext, 
           activitiesContext, 
           moodAnalysis, 
           recommendations, 
-          formattedChatHistory // Include chat history for context
+          formattedChatHistory, // Include chat history for context
+          userContext // Add user context to the message
         );
         
         // Process with AI and get response
+        console.log("Telegram webhook: Initializing Gemini model");
         const chat = model.startChat({ history: geminiMessages });
+        console.log("Telegram webhook: Sending message to Gemini");
         const result = await chat.sendMessage(userMessage);
         const aiResponse = result.response.text();
+        console.log("Telegram webhook: Received response from Gemini");
         
         // Save the bot's response to telegram_messages
         await supabase.from('telegram_messages').insert({
