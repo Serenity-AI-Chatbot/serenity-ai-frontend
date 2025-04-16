@@ -1,7 +1,7 @@
 import { requireAuth, supabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Get authenticated user
     const { session } = await requireAuth()
@@ -10,7 +10,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return new Response("Unauthorized", { status: 401 })
     }
 
-    const journalId = params.id
+    const { id } = await params
+    const journalId = id
     console.log(`📖 Fetching journal with ID: ${journalId}`)
 
     // Fetch the journal entry
