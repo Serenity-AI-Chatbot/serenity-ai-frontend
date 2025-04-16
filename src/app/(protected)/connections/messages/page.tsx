@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { ArrowLeft, Send, Loader2, Info } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Message = {
   message_id: string;
@@ -39,6 +41,7 @@ export default function MessagesPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Redirect if no connection ID provided
   useEffect(() => {
@@ -103,6 +106,13 @@ export default function MessagesPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Focus input when page loads
+  useEffect(() => {
+    if (!loading && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [loading]);
   
   // Send a message
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -144,6 +154,39 @@ export default function MessagesPage() {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Format date for message groups
+  const formatMessageDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = () => {
+    const groups: { [key: string]: Message[] } = {};
+    
+    messages.sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    ).forEach(message => {
+      const date = new Date(message.created_at).toDateString();
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(message);
+    });
+
+    return groups;
+  };
   
   // Handle back navigation
   const handleBack = () => {
@@ -154,101 +197,170 @@ export default function MessagesPage() {
     return null; // Will redirect in useEffect
   }
   
+  const messageGroups = groupMessagesByDate();
+  
   return (
-    <div className="container max-w-4xl mx-auto p-4 h-screen flex flex-col">
-      {/* Header */}
-      <Card className="p-4 mb-4 flex items-center">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="mr-2"
-          onClick={handleBack}
-        >
-          ←
-        </Button>
-        
-        {connectionInfo && (
-          <>
-            <Avatar className="h-10 w-10 mr-3">
-              {connectionInfo.profile_picture_url && (
-                <AvatarImage 
-                  src={connectionInfo.profile_picture_url} 
-                  alt={connectionInfo.display_name} 
-                />
-              )}
-              <AvatarFallback>
-                {connectionInfo.display_name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="font-bold">{connectionInfo.display_name}</h2>
-              <p className="text-sm text-gray-500 truncate max-w-xs">
-                {connectionInfo.bio || "No bio available"}
-              </p>
-            </div>
-          </>
-        )}
-      </Card>
-      
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto mb-4 bg-gray-50 rounded-lg p-4">
-        {loading ? (
-          <div className="text-center py-10">Loading messages...</div>
-        ) : messages.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <p>No messages yet</p>
-            <p className="text-sm mt-2">Send a message to start the conversation</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {messages.sort((a, b) => 
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            ).map((message) => (
-              <div
-                key={message.message_id}
-                className={`flex ${message.is_self ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    message.is_self
-                      ? "bg-blue-500 text-white"
-                      : "bg-white border border-gray-200"
-                  }`}
-                >
-                  <div>{message.content}</div>
-                  <div
-                    className={`text-xs mt-1 ${
-                      message.is_self ? "text-blue-100" : "text-gray-500"
-                    }`}
-                  >
-                    {formatTime(message.created_at)}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
-      
-      {/* Message Input */}
-      <Card className="p-3">
-        <form onSubmit={handleSendMessage} className="flex">
-          <Input
-            className="flex-1 mr-2"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            disabled={sending || loading || !connectionInfo || connectionInfo.connection_status !== "connected"}
-          />
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+      <div className="container max-w-4xl mx-auto p-4 h-screen flex flex-col">
+        {/* Header */}
+        <Card className="p-3 mb-4 flex items-center border-emerald-100 shadow-sm bg-white">
           <Button 
-            type="submit" 
-            disabled={sending || !newMessage.trim() || loading || !connectionInfo || connectionInfo.connection_status !== "connected"}
+            variant="ghost" 
+            size="icon" 
+            className="mr-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+            onClick={handleBack}
           >
-            Send
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-        </form>
-      </Card>
+          
+          {connectionInfo && (
+            <>
+              <Avatar className="h-10 w-10 mr-3 border-2 border-emerald-100">
+                {connectionInfo.profile_picture_url && (
+                  <AvatarImage 
+                    src={connectionInfo.profile_picture_url} 
+                    alt={connectionInfo.display_name} 
+                  />
+                )}
+                <AvatarFallback className="bg-emerald-100 text-emerald-800 font-medium">
+                  {connectionInfo.display_name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h2 className="font-bold text-emerald-800">{connectionInfo.display_name}</h2>
+                <p className="text-sm text-emerald-600 truncate max-w-xs">
+                  {connectionInfo.bio || "No bio available"}
+                </p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                <Info className="h-5 w-5" />
+              </Button>
+            </>
+          )}
+        </Card>
+        
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto mb-4 bg-white rounded-lg border border-emerald-100 shadow-sm p-4">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-full py-10 text-emerald-600">
+              <Loader2 className="h-8 w-8 animate-spin mb-4" />
+              <p>Loading messages...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center justify-center h-full py-20 text-emerald-600"
+            >
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                <Send className="h-6 w-6 text-emerald-600" />
+              </div>
+              <p className="font-medium">No messages yet</p>
+              <p className="text-sm mt-2">Send a message to start the conversation</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(messageGroups).map(([date, dateMessages]) => (
+                <div key={date} className="space-y-3">
+                  <div className="flex justify-center">
+                    <div className="bg-emerald-50 text-emerald-700 text-xs font-medium px-3 py-1 rounded-full">
+                      {formatMessageDate(dateMessages[0].created_at)}
+                    </div>
+                  </div>
+                  
+                  <AnimatePresence>
+                    {dateMessages.map((message, index) => {
+                      // Check if message is part of a consecutive group from same sender
+                      const isConsecutive = index > 0 && dateMessages[index-1].is_self === message.is_self;
+                      
+                      return (
+                        <motion.div
+                          key={message.message_id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className={`flex ${message.is_self ? "justify-end" : "justify-start"} ${isConsecutive ? "mt-1" : "mt-3"}`}
+                        >
+                          {!message.is_self && !isConsecutive && (
+                            <Avatar className="h-8 w-8 mr-2 mt-1 border border-emerald-100">
+                              {connectionInfo?.profile_picture_url && (
+                                <AvatarImage 
+                                  src={connectionInfo.profile_picture_url} 
+                                  alt={connectionInfo.display_name} 
+                                />
+                              )}
+                              <AvatarFallback className="text-xs bg-emerald-100 text-emerald-800">
+                                {connectionInfo?.display_name.substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          
+                          <div
+                            className={`max-w-[75%] rounded-2xl p-3 ${
+                              message.is_self
+                                ? "bg-emerald-600 text-white"
+                                : "bg-emerald-50 text-emerald-900"
+                            } ${message.is_self ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+                          >
+                            <div className="text-sm">{message.content}</div>
+                            <div
+                              className={`text-xs mt-1 text-right ${
+                                message.is_self ? "text-emerald-200" : "text-emerald-500"
+                              }`}
+                            >
+                              {formatTime(message.created_at)}
+                            </div>
+                          </div>
+                          
+                          {message.is_self && !isConsecutive && (
+                            <Avatar className="h-8 w-8 ml-2 mt-1 border border-emerald-100">
+                              <AvatarFallback className="text-xs bg-emerald-600 text-white">
+                                ME
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+        
+        {/* Message Input */}
+        <Card className="p-3 border-emerald-100 bg-white shadow-sm">
+          <form onSubmit={handleSendMessage} className="flex items-center">
+            <Input
+              ref={inputRef}
+              className="flex-1 mr-2 border-emerald-200 focus-visible:ring-emerald-600 py-6"
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              disabled={sending || loading || !connectionInfo || connectionInfo.connection_status !== "connected"}
+            />
+            <Button 
+              type="submit" 
+              disabled={sending || !newMessage.trim() || loading || !connectionInfo || connectionInfo.connection_status !== "connected"}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-1" />
+              )}
+              <span>Send</span>
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 } 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Pencil, Save, Mic, MapPin, MessageCircle, ArrowRight } from "lucide-react"
+import { Pencil, Save, Mic, MapPin, MessageCircle, ArrowRight, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -11,9 +11,10 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { AIVoiceInput } from "@/components/journal/ai-voice-input"
+import { AwsTranscribeZenInput } from "@/components/journal/aws-transcribe-input-zen"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 
 interface LocationData {
   latitude: number;
@@ -279,45 +280,88 @@ export function JournalEntry() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-black rounded-lg shadow-lg">
-      <div className="flex items-center gap-2 mb-6">
-        <Pencil className="w-6 h-6 text-emerald-500" />
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-emerald-500">Daily Journal</h2>
-      </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-2xl mx-auto p-8 bg-white dark:bg-black rounded-xl shadow-lg border border-emerald-100 dark:border-emerald-900/50"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
+        className="flex items-center gap-3 mb-8"
+      >
+        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+          <Pencil className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <h2 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-400">Daily Journal</h2>
+      </motion.div>
 
       {isProcessing ? (
-        <div className="py-8">
-          <div className="mb-6 text-center">
-            <div className="animate-pulse mb-4">
-              <div className="h-4 bg-emerald-200 rounded w-3/4 mx-auto mb-4"></div>
-              <div className="h-4 bg-emerald-200 rounded w-1/2 mx-auto"></div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="py-8"
+        >
+          <div className="mb-8 text-center">
+            <div className="mx-auto w-16 h-16 mb-6">
+              <svg className="w-full h-full" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path
+                  className="text-emerald-500 opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                >
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 12 12"
+                    to="360 12 12"
+                    dur="1s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </svg>
             </div>
-            <p className="text-emerald-600 dark:text-emerald-500">
-              Your journal entry is being processed...
+            <h3 className="text-xl font-medium text-emerald-700 dark:text-emerald-400 mb-2">
+              Processing your journal
+            </h3>
+            <p className="text-gray-700 dark:text-gray-300 max-w-md mx-auto">
+              We're analyzing your entry to provide personalized insights
             </p>
           </div>
           
           {/* Chat response section */}
-          <div className={`mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-all duration-300 ${chatResponse || isStreaming ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0 overflow-hidden'}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <MessageCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <div className={`mt-8 p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-all duration-500 ${chatResponse || isStreaming ? 'opacity-100 transform translate-y-0 max-h-[800px]' : 'opacity-0 transform -translate-y-4 max-h-0 overflow-hidden'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
               <h3 className="font-medium text-emerald-700 dark:text-emerald-400">
                 AI Reflection
               </h3>
             </div>
             
-            <div className="text-gray-800 dark:text-emerald-300 whitespace-pre-line min-h-[100px] prose prose-emerald prose-sm max-w-none">
+            <div className="text-gray-800 dark:text-gray-200 whitespace-pre-line min-h-[120px] prose prose-emerald prose-sm max-w-none">
               {chatResponse ? (
-                <p>{chatResponse}</p>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <p>{chatResponse}</p>
+                </motion.div>
               ) : isStreaming ? (
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex items-center gap-1">
-                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse delay-150"></div>
-                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse delay-300"></div>
+                <div className="flex items-center gap-2 py-4">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "300ms" }}></div>
                   </div>
-                  <span className="text-emerald-600 dark:text-emerald-400">
-                    Thinking about your journal...
+                  <span className="text-emerald-600 dark:text-emerald-400 ml-2 font-medium">
+                    Reflecting on your journal entry...
                   </span>
                 </div>
               ) : null}
@@ -325,7 +369,12 @@ export function JournalEntry() {
 
             {/* Add Talk more button when chat response is complete */}
             {chatResponse && !isStreaming && currentChatId && (
-              <div className="mt-4">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="mt-6"
+              >
                 <Button 
                   onClick={continueChat}
                   variant="outline" 
@@ -334,26 +383,30 @@ export function JournalEntry() {
                   <span>Talk more about this</span>
                   <ArrowRight className="h-4 w-4" />
                 </Button>
-              </div>
+              </motion.div>
             )}
           </div>
           
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              You can continue using the app.
-            </p>
-            <button
+          <div className="mt-10 text-center">
+            <Button
               onClick={handleNewEntry}
-              className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
+              variant="outline"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
             >
-              New Entry
-            </button>
+              Write a new entry
+            </Button>
           </div>
-        </div>
+        </motion.div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <motion.form 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          onSubmit={handleSubmit} 
+          className="space-y-6"
+        >
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
+            <label htmlFor="title" className="block text-sm font-medium text-emerald-700 dark:text-emerald-400 mb-2">
               Title
             </label>
             <input
@@ -361,44 +414,54 @@ export function JournalEntry() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+              className="w-full px-4 py-3 bg-white dark:bg-black border border-emerald-300 dark:border-emerald-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 shadow-sm"
               placeholder="Give your entry a title..."
             />
           </div>
 
           <div>
-            <label htmlFor="entry" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
+            <label htmlFor="entry" className="block text-sm font-medium text-emerald-700 dark:text-emerald-400 mb-2">
               Write your thoughts...
             </label>
             <div className="relative">
               <textarea
                 id="entry"
-                rows={6}
+                rows={8}
                 value={entry}
                 onChange={(e) => setEntry(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+                className="w-full px-4 py-3 bg-white dark:bg-black border border-emerald-300 dark:border-emerald-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 shadow-sm"
                 placeholder="What's on your mind today?"
               />
               <Dialog open={isVoiceInputOpen} onOpenChange={setIsVoiceInputOpen}>
                 <DialogTrigger asChild>
-                  <Button type="button" variant="outline" size="icon" className="absolute bottom-2 right-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon" 
+                    className="absolute bottom-3 right-3 bg-white dark:bg-emerald-900/50 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-800/70 text-emerald-600 dark:text-emerald-400"
+                  >
                     <Mic className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800">
                   <DialogHeader>
-                    <DialogTitle>Voice Input</DialogTitle>
-                    <DialogDescription>Speak to add text to your journal entry</DialogDescription>
+                    <DialogTitle className="text-emerald-700 dark:text-emerald-400">Voice Input</DialogTitle>
+                    <DialogDescription className="text-gray-600 dark:text-gray-400">
+                      Speak to add text to your journal entry
+                    </DialogDescription>
                   </DialogHeader>
-                  <AIVoiceInput onStart={() => setVoiceText("")} onStop={handleVoiceInput} />
+                  <AwsTranscribeZenInput onStart={() => setVoiceText("")} onStop={handleVoiceInput} />
                 </DialogContent>
               </Dialog>
             </div>
           </div>
 
           {/* Location Toggle */}
-          <div className="flex items-center space-x-2">
-            <div className="relative inline-flex items-center cursor-pointer" onClick={() => !isGettingLocation && setUseLocation(!useLocation)}>
+          <div className="flex items-center space-x-2 pt-2">
+            <div 
+              className="relative inline-flex items-center cursor-pointer" 
+              onClick={() => !isGettingLocation && setUseLocation(!useLocation)}
+            >
               <input
                 type="checkbox"
                 id="use-location"
@@ -408,23 +471,23 @@ export function JournalEntry() {
                 className="sr-only"
               />
               <div 
-                className={`w-11 h-6 rounded-full transition ${
+                className={`w-12 h-6 rounded-full transition-colors ${
                   useLocation 
-                    ? 'bg-emerald-500' 
+                    ? 'bg-emerald-500 dark:bg-emerald-600' 
                     : 'bg-gray-200 dark:bg-gray-700'
                 }`}
               >
                 <div 
-                  className={`transform transition-transform duration-200 absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full ${
-                    useLocation ? 'translate-x-5' : 'translate-x-0'
+                  className={`transform transition-transform duration-300 absolute top-0.5 left-0.5 bg-white dark:bg-emerald-100 w-5 h-5 rounded-full shadow-sm ${
+                    useLocation ? 'translate-x-6' : 'translate-x-0'
                   }`}
                 />
               </div>
               <label 
                 htmlFor="use-location" 
-                className="ml-3 flex items-center gap-2 cursor-pointer text-sm font-medium"
+                className="ml-3 flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                <MapPin className="h-4 w-4 text-emerald-500" />
+                <MapPin className="h-4 w-4 text-emerald-500 dark:text-emerald-500" />
                 Include my location
               </label>
             </div>
@@ -432,14 +495,14 @@ export function JournalEntry() {
 
           {/* Location Status */}
           {useLocation && (
-            <div className="text-sm">
+            <div className="text-sm -mt-2 ml-16">
               {isGettingLocation ? (
-                <div className="flex items-center text-emerald-600 dark:text-emerald-500">
+                <div className="flex items-center text-gray-600 dark:text-gray-400">
                   <div className="mr-2 h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></div>
                   Getting your location...
                 </div>
               ) : location ? (
-                <div className="text-emerald-600 dark:text-emerald-500">
+                <div className="text-gray-600 dark:text-gray-400">
                   <div className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
                     {location.placeName || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
@@ -451,20 +514,32 @@ export function JournalEntry() {
             </div>
           )}
 
-          <span className="text-red-500 text-sm mt-2">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg px-4 py-3 text-gray-700 dark:text-gray-300 text-sm">
             ⚠️ Voice input is supported only in the latest versions of Safari and Chrome browsers not supported in Brave.
-          </span>
+          </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed h-auto font-medium"
           >
-            <Save className="w-5 h-5" />
-            {isSubmitting ? "Saving..." : "Save Entry"}
-          </button>
-        </form>
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                Save Entry
+              </>
+            )}
+          </Button>
+        </motion.form>
       )}
-    </div>
+    </motion.div>
   )
 }

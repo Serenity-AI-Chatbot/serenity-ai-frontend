@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConnectionCard from "@/components/ConnectionCard";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Loader2, UserPlus, Users } from "lucide-react";
+import { Loader2, UserPlus, Users, Bell, Search } from "lucide-react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 type Connection = {
   connection_id: string;
@@ -126,93 +127,155 @@ export default function ConnectionsPage() {
     window.location.href = `/connections/messages/${connectionId}`;
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        staggerChildren: 0.1 
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { type: "spring", stiffness: 100 }
+    }
+  };
+
   return (
-    <div className="container max-w-4xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-emerald-800">Your Connections</h1>
-        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" asChild>
-          <Link href="/connections/discover" className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
-            Discover People
-          </Link>
-        </Button>
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+      <div className="container max-w-4xl mx-auto px-4 py-10">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-800">Your Connections</h1>
+            <p className="text-emerald-600 mt-1">Stay connected with your network</p>
+          </div>
+          <div className="flex gap-3">
+            <Button className="bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200" asChild>
+              <Link href="/profile/connections" className="flex items-center gap-2">
+                Settings
+              </Link>
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm" asChild>
+              <Link href="/connections/discover" className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Discover People
+              </Link>
+            </Button>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-emerald-100">
+          <Tabs defaultValue="connections" onValueChange={setActiveTab}>
+            <TabsList className="mb-6 bg-emerald-50 border border-emerald-100 p-1 rounded-lg w-full">
+              <TabsTrigger 
+                value="connections" 
+                className="flex-1 py-2.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-md transition-all"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Connections ({connections.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="requests" 
+                className="flex-1 py-2.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-md transition-all"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Requests
+                {pendingConnections.length > 0 && (
+                  <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                    {pendingConnections.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="connections">
+              {isLoading ? (
+                <div className="flex justify-center items-center p-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                </div>
+              ) : connections.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-center p-12 bg-emerald-50 rounded-lg border border-emerald-100"
+                >
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="h-8 w-8 text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-medium mb-2 text-emerald-800">No connections yet</h3>
+                  <p className="text-emerald-700 mb-5 max-w-md mx-auto">Start connecting with others who share similar interests and experiences</p>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-sm" asChild>
+                    <Link href="/connections/discover" className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Discover People
+                    </Link>
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-4"
+                >
+                  {connections.map((connection) => (
+                    <motion.div key={connection.connection_id} variants={itemVariants}>
+                      <ConnectionCard
+                        connection={connection}
+                        onMessage={handleMessageConnection}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="requests">
+              {isLoading ? (
+                <div className="flex justify-center items-center p-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                </div>
+              ) : pendingConnections.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-center p-12 bg-emerald-50 rounded-lg border border-emerald-100"
+                >
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bell className="h-8 w-8 text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-medium text-emerald-800">No pending requests</h3>
+                  <p className="text-emerald-700 mt-2">When someone sends you a connection request, it will appear here</p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="space-y-4"
+                >
+                  {pendingConnections.map((connection) => (
+                    <motion.div key={connection.connection_id} variants={itemVariants}>
+                      <ConnectionCard
+                        connection={connection}
+                        onAccept={handleAcceptConnection}
+                        onReject={handleRejectConnection}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-      
-      <Tabs defaultValue="connections" onValueChange={setActiveTab}>
-        <TabsList className="mb-4 bg-emerald-50 border-emerald-100">
-          <TabsTrigger 
-            value="connections" 
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Connections
-          </TabsTrigger>
-          <TabsTrigger 
-            value="requests" 
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            Requests
-            {pendingConnections.length > 0 && (
-              <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                {pendingConnections.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="connections">
-          {isLoading ? (
-            <div className="flex justify-center items-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-            </div>
-          ) : connections.length === 0 ? (
-            <div className="text-center p-12 bg-emerald-50 rounded-lg border border-emerald-100">
-              <h3 className="text-lg font-medium mb-2 text-emerald-800">No connections yet</h3>
-              <p className="text-emerald-700 mb-4">Start connecting with others by visiting the discover page</p>
-              <Button className="bg-emerald-600 hover:bg-emerald-700" asChild>
-                <Link href="/connections/discover" className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" />
-                  Discover People
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div>
-              {connections.map((connection) => (
-                <ConnectionCard
-                  key={connection.connection_id}
-                  connection={connection}
-                  onMessage={handleMessageConnection}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="requests">
-          {isLoading ? (
-            <div className="flex justify-center items-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-            </div>
-          ) : pendingConnections.length === 0 ? (
-            <div className="text-center p-12 bg-emerald-50 rounded-lg border border-emerald-100">
-              <h3 className="text-lg font-medium text-emerald-800">No pending requests</h3>
-              <p className="text-emerald-700">When someone sends you a connection request, it will appear here</p>
-            </div>
-          ) : (
-            <div>
-              {pendingConnections.map((connection) => (
-                <ConnectionCard
-                  key={connection.connection_id}
-                  connection={connection}
-                  onAccept={handleAcceptConnection}
-                  onReject={handleRejectConnection}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
     </div>
   );
 } 

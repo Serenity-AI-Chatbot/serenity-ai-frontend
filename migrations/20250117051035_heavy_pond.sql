@@ -1053,7 +1053,7 @@ CREATE POLICY "Users can send messages to their connections"
     )
   );
 
--- Function to calculate mood similarity between two users
+-- Function to calculate mood similarity between two users with improved handling
 CREATE OR REPLACE FUNCTION calculate_mood_similarity(
   user1_id UUID,
   user2_id UUID,
@@ -1064,7 +1064,32 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   similarity FLOAT;
+  user1_has_data BOOLEAN;
+  user2_has_data BOOLEAN;
+  default_score FLOAT := 0.3; -- Default base similarity
 BEGIN
+  -- Check if users have any mood data
+  SELECT EXISTS (
+    SELECT 1
+    FROM journals
+    WHERE user_id = user1_id
+    AND created_at >= NOW() - (days_back || ' days')::INTERVAL
+    AND array_length(mood_tags, 1) > 0
+  ) INTO user1_has_data;
+  
+  SELECT EXISTS (
+    SELECT 1
+    FROM journals
+    WHERE user_id = user2_id
+    AND created_at >= NOW() - (days_back || ' days')::INTERVAL
+    AND array_length(mood_tags, 1) > 0
+  ) INTO user2_has_data;
+
+  -- If either user has no data, return a default base similarity
+  IF NOT user1_has_data OR NOT user2_has_data THEN
+    RETURN default_score;
+  END IF;
+
   -- Calculate similarity based on mood_tags overlap in recent journals
   WITH user1_moods AS (
     SELECT unnest(mood_tags) as mood, COUNT(*) as count
@@ -1091,15 +1116,16 @@ BEGIN
   )
   SELECT COALESCE(
     CASE 
-      WHEN (SELECT COUNT(*) FROM user1_moods) = 0 OR (SELECT COUNT(*) FROM user2_moods) = 0 THEN 0
-      ELSE (SELECT AVG(mood_similarity) FROM common_moods)
-    END, 0) INTO similarity;
+      WHEN (SELECT COUNT(*) FROM user1_moods) = 0 OR (SELECT COUNT(*) FROM user2_moods) = 0 THEN default_score
+      WHEN (SELECT COUNT(*) FROM common_moods) = 0 THEN 0.1 -- Some small similarity if they have data but no overlap
+      ELSE GREATEST((SELECT AVG(mood_similarity) FROM common_moods), 0.1) -- Ensure at least some similarity
+    END, default_score) INTO similarity;
   
   RETURN similarity;
 END;
 $$;
 
--- Function to calculate activity similarity between two users
+-- Function to calculate activity similarity between two users with improved handling
 CREATE OR REPLACE FUNCTION calculate_activity_similarity(
   user1_id UUID,
   user2_id UUID,
@@ -1110,7 +1136,32 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   similarity FLOAT;
+  user1_has_data BOOLEAN;
+  user2_has_data BOOLEAN;
+  default_score FLOAT := 0.2; -- Default base similarity
 BEGIN
+  -- Check if users have any activity data
+  SELECT EXISTS (
+    SELECT 1
+    FROM user_activities ua
+    WHERE ua.user_id = user1_id
+    AND ua.completed_at IS NOT NULL
+    AND ua.completed_at >= NOW() - (days_back || ' days')::INTERVAL
+  ) INTO user1_has_data;
+  
+  SELECT EXISTS (
+    SELECT 1
+    FROM user_activities ua
+    WHERE ua.user_id = user2_id
+    AND ua.completed_at IS NOT NULL
+    AND ua.completed_at >= NOW() - (days_back || ' days')::INTERVAL
+  ) INTO user2_has_data;
+
+  -- If either user has no data, return a default base similarity
+  IF NOT user1_has_data OR NOT user2_has_data THEN
+    RETURN default_score;
+  END IF;
+
   -- Calculate similarity based on completed activities
   WITH user1_activities AS (
     SELECT a.category, COUNT(*) as count
@@ -1141,15 +1192,16 @@ BEGIN
   )
   SELECT COALESCE(
     CASE 
-      WHEN (SELECT COUNT(*) FROM user1_activities) = 0 OR (SELECT COUNT(*) FROM user2_activities) = 0 THEN 0
-      ELSE (SELECT AVG(category_similarity) FROM common_categories)
-    END, 0) INTO similarity;
+      WHEN (SELECT COUNT(*) FROM user1_activities) = 0 OR (SELECT COUNT(*) FROM user2_activities) = 0 THEN default_score
+      WHEN (SELECT COUNT(*) FROM common_categories) = 0 THEN 0.1 -- Some small similarity if they have data but no overlap
+      ELSE GREATEST((SELECT AVG(category_similarity) FROM common_categories), 0.1) -- Ensure at least some similarity
+    END, default_score) INTO similarity;
   
   RETURN similarity;
 END;
 $$;
 
--- Function to calculate context similarity between two users
+-- Function to calculate context similarity between two users with improved handling
 CREATE OR REPLACE FUNCTION calculate_context_similarity(
   user1_id UUID,
   user2_id UUID
@@ -1159,7 +1211,28 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   similarity FLOAT;
+  user1_has_data BOOLEAN;
+  user2_has_data BOOLEAN;
+  default_score FLOAT := 0.25; -- Default base similarity
 BEGIN
+  -- Check if users have any context data
+  SELECT EXISTS (
+    SELECT 1
+    FROM user_context
+    WHERE user_id = user1_id
+  ) INTO user1_has_data;
+  
+  SELECT EXISTS (
+    SELECT 1
+    FROM user_context
+    WHERE user_id = user2_id
+  ) INTO user2_has_data;
+
+  -- If either user has no data, return a default base similarity
+  IF NOT user1_has_data OR NOT user2_has_data THEN
+    RETURN default_score;
+  END IF;
+
   -- Calculate similarity based on user_context data
   WITH user1_contexts AS (
     SELECT entity_type, COUNT(*) as count
@@ -1184,9 +1257,10 @@ BEGIN
   )
   SELECT COALESCE(
     CASE 
-      WHEN (SELECT COUNT(*) FROM user1_contexts) = 0 OR (SELECT COUNT(*) FROM user2_contexts) = 0 THEN 0
-      ELSE (SELECT AVG(context_similarity) FROM common_contexts)
-    END, 0) INTO similarity;
+      WHEN (SELECT COUNT(*) FROM user1_contexts) = 0 OR (SELECT COUNT(*) FROM user2_contexts) = 0 THEN default_score
+      WHEN (SELECT COUNT(*) FROM common_contexts) = 0 THEN 0.1 -- Some small similarity if they have data but no overlap
+      ELSE GREATEST((SELECT AVG(context_similarity) FROM common_contexts), 0.1) -- Ensure at least some similarity
+    END, default_score) INTO similarity;
   
   RETURN similarity;
 END;
@@ -1219,15 +1293,18 @@ BEGIN
   -- Insert new recommendations
   WITH potential_recommendations AS (
     SELECT 
-      up.user_id,
-      (
-        (calculate_mood_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'mood_match_weight')::float, 0.5)) +
-        (calculate_activity_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'activity_match_weight')::float, 0.3)) +
-        (calculate_context_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'context_match_weight')::float, 0.2))
-      ) as match_score,
-      calculate_mood_similarity(p_user_id, up.user_id) as mood_similarity,
-      calculate_activity_similarity(p_user_id, up.user_id) as activity_similarity,
-      calculate_context_similarity(p_user_id, up.user_id) as context_similarity
+      up.user_id AS rec_user_id,
+      up.display_name AS rec_display_name,
+      up.bio AS rec_bio,
+      up.profile_picture_url AS rec_profile_picture_url,
+      -- Calculate individual similarities
+      calculate_mood_similarity(p_user_id, up.user_id) as mood_sim,
+      calculate_activity_similarity(p_user_id, up.user_id) as activity_sim,
+      calculate_context_similarity(p_user_id, up.user_id) as context_sim,
+      -- Get user preferences or use defaults
+      COALESCE((p.connection_preferences->>'mood_match_weight')::float, 0.5) as mood_weight,
+      COALESCE((p.connection_preferences->>'activity_match_weight')::float, 0.3) as activity_weight,
+      COALESCE((p.connection_preferences->>'context_match_weight')::float, 0.2) as context_weight
     FROM user_profiles up
     JOIN user_profiles p ON p.user_id = p_user_id
     WHERE 
@@ -1252,7 +1329,25 @@ BEGIN
         AND ur.recommended_user_id = up.user_id
         AND (ur.is_rejected = TRUE OR ur.is_approved = TRUE)
       )
-    ORDER BY match_score DESC
+  ),
+  scored_recommendations AS (
+    SELECT
+      rec_user_id,
+      rec_display_name,
+      rec_bio,
+      rec_profile_picture_url,
+      mood_sim,
+      activity_sim,
+      context_sim,
+      -- Calculate weighted overall score with minimum threshold
+      GREATEST(
+        (mood_sim * mood_weight) + 
+        (activity_sim * activity_weight) + 
+        (context_sim * context_weight),
+        0.15  -- Ensure a minimum match score
+      ) as overall_score
+    FROM potential_recommendations
+    ORDER BY overall_score DESC
     LIMIT p_limit
   )
   INSERT INTO user_recommendations (
@@ -1265,17 +1360,17 @@ BEGIN
   )
   SELECT 
     p_user_id,
-    pr.user_id,
-    pr.match_score,
-    pr.mood_similarity,
-    pr.activity_similarity,
-    pr.context_similarity
-  FROM potential_recommendations pr
+    sr.rec_user_id,
+    sr.overall_score,
+    sr.mood_sim,
+    sr.activity_sim,
+    sr.context_sim
+  FROM scored_recommendations sr
   WHERE NOT EXISTS (
     -- Final check to avoid violating the unique constraint
     SELECT 1 FROM user_recommendations ur
     WHERE ur.user_id = p_user_id
-    AND ur.recommended_user_id = pr.user_id
+    AND ur.recommended_user_id = sr.rec_user_id
   );
   
   -- Return the recommendations with user profile information
