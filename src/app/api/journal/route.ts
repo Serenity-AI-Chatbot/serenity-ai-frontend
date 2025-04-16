@@ -191,39 +191,58 @@ export async function POST(request: Request) {
       agent: httpsAgent
     };
 
-    const req = https.request(options, (res) => {
-      console.log(`📝 Flask API responded with status: ${res.statusCode}`);
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
+    // Create a Promise wrapper for the https request
+    const makeRequest = new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        console.log(`📝 Flask API responded with status: ${res.statusCode}`);
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          console.log(`📝 Flask API response: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
+          if (res.statusCode !== 200) {
+            console.error(`❌ Flask API returned error status: ${res.statusCode}`);
+            console.error(`❌ Response data: ${data}`);
+            reject(new Error(`Flask API returned status ${res.statusCode}`));
+          } else {
+            resolve(data);
+          }
+        });
       });
-      res.on('end', () => {
-        console.log(`📝 Flask API response: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
-        if (res.statusCode !== 200) {
-          console.error(`❌ Flask API returned error status: ${res.statusCode}`);
-          console.error(`❌ Response data: ${data}`);
-        }
+
+      req.on('error', (err) => {
+        console.error('❌ Error sending request to Flask API:', err);
+        console.error('❌ Error details:', {
+          message: err.message,
+          stack: err.stack
+        });
+        reject(err);
       });
+
+      // Set a timeout for the request
+      req.setTimeout(10000, () => {
+        console.error('❌ Request to Flask API timed out after 10 seconds');
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+
+      req.write(postData);
+      req.end();
     });
 
-    req.on('error', (err) => {
-      console.error('❌ Error sending request to Flask API:', err);
-      console.error('❌ Error details:', {
-        message: err.message,
-        stack: err.stack
-      });
-    });
+    try {
+      // Wait for the request to complete
+      await makeRequest;
+      console.log('📝 Successfully sent request to Flask API');
+    } catch (error) {
+      console.error('❌ Failed to send request to Flask API:', error);
+      // Don't return error to client since we still want to return the journal
+      // Just log the error and continue
+    }
 
-    // Set a timeout for the request
-    req.setTimeout(10000, () => {
-      console.error('❌ Request to Flask API timed out after 10 seconds');
-      req.destroy();
-    });
-
-    req.write(postData);
-    req.end();
-
-    console.log(`📝 Journal creation completed, returning response to client`);
     return NextResponse.json({
       ...journal,
       status: 'processing',
