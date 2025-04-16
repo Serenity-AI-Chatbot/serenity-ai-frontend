@@ -188,7 +188,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData)
       },
-      rejectUnauthorized: false
+      agent: httpsAgent
     };
 
     const req = https.request(options, (res) => {
@@ -199,11 +199,25 @@ export async function POST(request: Request) {
       });
       res.on('end', () => {
         console.log(`📝 Flask API response: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
+        if (res.statusCode !== 200) {
+          console.error(`❌ Flask API returned error status: ${res.statusCode}`);
+          console.error(`❌ Response data: ${data}`);
+        }
       });
     });
 
     req.on('error', (err) => {
       console.error('❌ Error sending request to Flask API:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        stack: err.stack
+      });
+    });
+
+    // Set a timeout for the request
+    req.setTimeout(10000, () => {
+      console.error('❌ Request to Flask API timed out after 10 seconds');
+      req.destroy();
     });
 
     req.write(postData);
