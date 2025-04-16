@@ -150,9 +150,15 @@ export async function POST(request: Request) {
     console.log(`📝 Initial journal created with ID: ${journal.id}`);
 
     // Get the webhook URL (base URL + webhook path)
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
-    const host = request.headers.get('host') || 'localhost:3000'
-    const webhookUrl = `${protocol}://${host}/api/journal/webhook`
+    let webhookUrl
+    if (process.env.NODE_ENV === 'development') {
+      webhookUrl = `https://serenity-ai-frontend-2.vercel.app/api/journal/webhook`
+    }
+    else{
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+      const host = request.headers.get('host') || 'localhost:3000'
+      webhookUrl = `${protocol}://${host}/api/journal/webhook`
+    }
     console.log(`📝 Webhook URL: ${webhookUrl}`);
     
     // Call Flask API to process the journal content asynchronously
