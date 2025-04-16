@@ -1,7 +1,7 @@
 "use client"
 
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar"
-import { Home, MessageSquare, LineChart, Book, Activity, LogOut, User } from "lucide-react"
+import { Home, MessageSquare, LineChart, Book, Activity, LogOut, User, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export function DashboardSidebar() {
@@ -36,6 +36,16 @@ export function DashboardSidebar() {
     {
       label: "User",
       href: "/user",
+      icon: <User className="w-5 h-5 text-emerald-500" />,
+    },
+    {
+      label: "Connections",
+      href: "/connections",
+      icon: <Users className="w-5 h-5 text-emerald-500" />,
+    },
+    {
+      label: "Profile",
+      href: "/profile/connections",
       icon: <User className="w-5 h-5 text-emerald-500" />,
     },
   ]
