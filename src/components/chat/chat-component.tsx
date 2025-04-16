@@ -155,6 +155,11 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
     if (initialChatId) {
       setCurrentChatId(initialChatId);
       setIsNewChat(false);
+    } else {
+      // If we're at the /chat route without an ID, ensure it's a new empty chat
+      setCurrentChatId(null);
+      setIsNewChat(true);
+      setMessages([]);
     }
   }, [initialChatId]);
 
@@ -168,9 +173,14 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
       const data = await response.json();
       setChats(data);
       
-      // If initialChatId is not set and there are chats, select the most recent one
-      if (!initialChatId && !currentChatId && data.length > 0) {
-        setCurrentChatId(data[0].id);
+      // Only auto-select the most recent chat if initialChatId is explicitly provided
+      // This prevents loading a chat when on the root /chat page
+      if (initialChatId && !currentChatId && data.length > 0) {
+        // Find the chat with the matching ID
+        const matchingChat = data.find((chat: Chat) => chat.id === initialChatId);
+        if (matchingChat) {
+          setCurrentChatId(initialChatId);
+        }
       }
     } catch (error) {
       console.error("Error fetching chats:", error);
@@ -244,6 +254,9 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
     // Use a new messages array if this is a new chat
     const currentMessages = isNewChat ? [userMessage] : [...messages, userMessage];
     
+    // Save the current conversation state to ensure we can restore it if needed
+    const initialConversationState = [...currentMessages];
+    
     setMessages(currentMessages);
     setInput("");
     setIsTyping(true);
@@ -270,7 +283,7 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
       }
 
       let assistantMessage = "";
-      // Update without refreshing the whole list
+      // Add a temporary empty assistant message that will be updated
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       while (true) {
@@ -284,19 +297,37 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
               const jsonData = JSON.parse(line.slice(5));
               if (jsonData.text) {
                 assistantMessage += jsonData.text;
+                // Update only the last message (assistant's message)
                 setMessages((prev: any) => {
-                  // Get the last message (which is the assistant's partial response)
-                  const updatedMessages = [
+                  // Ensure we have at least two messages - the user message and assistant message
+                  if (prev.length < 2) {
+                    // This should never happen, but just in case
+                    return [
+                      { role: "user" as const, content: input },
+                      { role: "assistant" as const, content: assistantMessage }
+                    ];
+                  }
+                  
+                  return [
                     ...prev.slice(0, -1),
-                    { role: "assistant", content: assistantMessage },
+                    { role: "assistant", content: assistantMessage }
                   ];
-                  return updatedMessages;
                 });
                 
                 // Update current chat ID if this is a new chat
                 if (jsonData.chatId && isNewChat) {
+                  // Store the current messages before changing chat ID
+                  const currentConversation = [
+                    ...initialConversationState, 
+                    { role: "assistant" as const, content: assistantMessage }
+                  ];
+                  
                   setCurrentChatId(jsonData.chatId);
                   setIsNewChat(false);
+                  
+                  // Explicitly set messages again to ensure they're not lost during the transition
+                  setMessages(currentConversation);
+                  
                   // Navigate to the individual chat page without forcing a refresh
                   window.history.pushState({}, "", `/chat/${jsonData.chatId}`);
                   // Refresh the chat list without forcing a navigation
@@ -310,13 +341,20 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
         }
       }
 
-      // Final message update
+      // Final message update - only update the assistant's message
       setMessages((prev: any) => {
-        const updatedMessages = [
+        // Safety check: if we somehow lost messages, restore from our saved state
+        if (prev.length < 2) {
+          return [
+            ...initialConversationState,
+            { role: "assistant" as const, content: assistantMessage }
+          ];
+        }
+        
+        return [
           ...prev.slice(0, -1),
-          { role: "assistant", content: assistantMessage },
+          { role: "assistant", content: assistantMessage }
         ];
-        return updatedMessages;
       });
 
       // Only speak if voice response is enabled, regardless of input method
