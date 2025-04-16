@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: "Chat with Serenity AI to improve your mental well-being.",
 };
 
-export default function ChatPage({ params }: { params: { id: string } }) {
-  const { id } = params;
-  return <ChatComponent initialChatId={id} />;
+interface PageProps {
+  params: Promise<{ chatId: string }>;
+}
+
+export default async function ChatPage({ params }: PageProps) {
+  const { chatId } = await params;
+  return <ChatComponent initialChatId={chatId} />;
 } 
