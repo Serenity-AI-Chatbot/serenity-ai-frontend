@@ -314,7 +314,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
       ) : (
         // Actual content when not processing
         <>
-          {/* {!isProcessing && videoId && (
+          {!isProcessing && videoId && (
             <Card>
               <CardContent>
                 <div className="flex items-center gap-2 mb-4">
@@ -337,7 +337,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                 </div>
               </CardContent>
             </Card>
-          )} */}
+          )}
           
           {/* Nearby places */}
           {suggestions.places.length > 0 && (
