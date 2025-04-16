@@ -886,3 +886,697 @@ $$;
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION get_user_context TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_context TO service_role; 
+
+-- Create user profiles table with privacy settings
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) UNIQUE,
+  display_name TEXT,
+  bio TEXT,
+  interests TEXT[],
+  profile_picture_url TEXT,
+  is_discoverable BOOLEAN DEFAULT TRUE,
+  shared_mood_data BOOLEAN DEFAULT TRUE, 
+  shared_activity_data BOOLEAN DEFAULT TRUE,
+  shared_context_data BOOLEAN DEFAULT TRUE,
+  connection_preferences JSONB DEFAULT '{"mood_match_weight": 0.5, "activity_match_weight": 0.3, "context_match_weight": 0.2}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add indexes
+CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX idx_user_profiles_discoverable ON user_profiles(is_discoverable);
+
+-- Enable RLS
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view all discoverable profiles"
+  ON user_profiles
+  FOR SELECT
+  USING (is_discoverable = TRUE);
+
+CREATE POLICY "Users can view their own profile"
+  ON user_profiles
+  FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own profile"
+  ON user_profiles
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own profile"
+  ON user_profiles
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+-- User recommendations table to store matches
+CREATE TABLE IF NOT EXISTS user_recommendations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  recommended_user_id UUID REFERENCES auth.users(id),
+  match_score FLOAT NOT NULL,
+  mood_similarity FLOAT,
+  activity_similarity FLOAT,
+  context_similarity FLOAT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_approved BOOLEAN DEFAULT FALSE,
+  is_rejected BOOLEAN DEFAULT FALSE,
+  UNIQUE(user_id, recommended_user_id)
+);
+
+-- Add indexes
+CREATE INDEX idx_user_recommendations_user_id ON user_recommendations(user_id);
+CREATE INDEX idx_user_recommendations_recommended_user_id ON user_recommendations(recommended_user_id);
+CREATE INDEX idx_user_recommendations_match_score ON user_recommendations(match_score);
+
+-- Enable RLS
+ALTER TABLE user_recommendations ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view their own recommendations"
+  ON user_recommendations
+  FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can update their own recommendations"
+  ON user_recommendations
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own recommendations"
+  ON user_recommendations
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+-- Tables for connections
+CREATE TABLE IF NOT EXISTS user_connections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user1_id UUID REFERENCES auth.users(id),
+  user2_id UUID REFERENCES auth.users(id),
+  connection_status TEXT CHECK (connection_status IN ('pending', 'connected', 'rejected')),
+  initiator_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user1_id, user2_id)
+);
+
+-- Add indexes
+CREATE INDEX idx_user_connections_user1_id ON user_connections(user1_id);
+CREATE INDEX idx_user_connections_user2_id ON user_connections(user2_id);
+CREATE INDEX idx_user_connections_status ON user_connections(connection_status);
+
+-- Enable RLS
+ALTER TABLE user_connections ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view their own connections"
+  ON user_connections
+  FOR SELECT
+  USING (user1_id = auth.uid() OR user2_id = auth.uid());
+
+CREATE POLICY "Users can update their own connections"
+  ON user_connections
+  FOR UPDATE
+  USING (user1_id = auth.uid() OR user2_id = auth.uid())
+  WITH CHECK (user1_id = auth.uid() OR user2_id = auth.uid());
+
+CREATE POLICY "Users can insert their own connections"
+  ON user_connections
+  FOR INSERT
+  WITH CHECK (user1_id = auth.uid() OR user2_id = auth.uid());
+
+-- Messages for connected users
+CREATE TABLE IF NOT EXISTS connection_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  connection_id UUID REFERENCES user_connections(id) ON DELETE CASCADE,
+  sender_id UUID REFERENCES auth.users(id),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_read BOOLEAN DEFAULT FALSE
+);
+
+-- Add indexes
+CREATE INDEX idx_connection_messages_connection_id ON connection_messages(connection_id);
+CREATE INDEX idx_connection_messages_sender_id ON connection_messages(sender_id);
+CREATE INDEX idx_connection_messages_created_at ON connection_messages(created_at);
+
+-- Enable RLS
+ALTER TABLE connection_messages ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies for connection messages
+CREATE POLICY "Users can view messages from their connections"
+  ON connection_messages
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_connections
+      WHERE id = connection_messages.connection_id
+      AND (user1_id = auth.uid() OR user2_id = auth.uid())
+    )
+  );
+
+CREATE POLICY "Users can send messages to their connections"
+  ON connection_messages
+  FOR INSERT
+  WITH CHECK (
+    sender_id = auth.uid() AND
+    EXISTS (
+      SELECT 1 FROM user_connections
+      WHERE id = connection_messages.connection_id
+      AND (user1_id = auth.uid() OR user2_id = auth.uid())
+      AND connection_status = 'connected'
+    )
+  );
+
+-- Function to calculate mood similarity between two users
+CREATE OR REPLACE FUNCTION calculate_mood_similarity(
+  user1_id UUID,
+  user2_id UUID,
+  days_back INT DEFAULT 90
+)
+RETURNS FLOAT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  similarity FLOAT;
+BEGIN
+  -- Calculate similarity based on mood_tags overlap in recent journals
+  WITH user1_moods AS (
+    SELECT unnest(mood_tags) as mood, COUNT(*) as count
+    FROM journals
+    WHERE user_id = user1_id
+    AND created_at >= NOW() - (days_back || ' days')::INTERVAL
+    GROUP BY mood
+  ),
+  user2_moods AS (
+    SELECT unnest(mood_tags) as mood, COUNT(*) as count
+    FROM journals
+    WHERE user_id = user2_id
+    AND created_at >= NOW() - (days_back || ' days')::INTERVAL
+    GROUP BY mood
+  ),
+  common_moods AS (
+    SELECT 
+      u1.mood, 
+      u1.count as u1_count, 
+      u2.count as u2_count,
+      LEAST(u1.count, u2.count)::float / GREATEST(u1.count, u2.count)::float as mood_similarity
+    FROM user1_moods u1
+    JOIN user2_moods u2 ON u1.mood = u2.mood
+  )
+  SELECT COALESCE(
+    CASE 
+      WHEN (SELECT COUNT(*) FROM user1_moods) = 0 OR (SELECT COUNT(*) FROM user2_moods) = 0 THEN 0
+      ELSE (SELECT AVG(mood_similarity) FROM common_moods)
+    END, 0) INTO similarity;
+  
+  RETURN similarity;
+END;
+$$;
+
+-- Function to calculate activity similarity between two users
+CREATE OR REPLACE FUNCTION calculate_activity_similarity(
+  user1_id UUID,
+  user2_id UUID,
+  days_back INT DEFAULT 90
+)
+RETURNS FLOAT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  similarity FLOAT;
+BEGIN
+  -- Calculate similarity based on completed activities
+  WITH user1_activities AS (
+    SELECT a.category, COUNT(*) as count
+    FROM user_activities ua
+    JOIN activities a ON ua.activity_id = a.id
+    WHERE ua.user_id = user1_id
+    AND ua.completed_at IS NOT NULL
+    AND ua.completed_at >= NOW() - (days_back || ' days')::INTERVAL
+    GROUP BY a.category
+  ),
+  user2_activities AS (
+    SELECT a.category, COUNT(*) as count
+    FROM user_activities ua
+    JOIN activities a ON ua.activity_id = a.id
+    WHERE ua.user_id = user2_id
+    AND ua.completed_at IS NOT NULL
+    AND ua.completed_at >= NOW() - (days_back || ' days')::INTERVAL
+    GROUP BY a.category
+  ),
+  common_categories AS (
+    SELECT 
+      u1.category, 
+      u1.count as u1_count, 
+      u2.count as u2_count,
+      LEAST(u1.count, u2.count)::float / GREATEST(u1.count, u2.count)::float as category_similarity
+    FROM user1_activities u1
+    JOIN user2_activities u2 ON u1.category = u2.category
+  )
+  SELECT COALESCE(
+    CASE 
+      WHEN (SELECT COUNT(*) FROM user1_activities) = 0 OR (SELECT COUNT(*) FROM user2_activities) = 0 THEN 0
+      ELSE (SELECT AVG(category_similarity) FROM common_categories)
+    END, 0) INTO similarity;
+  
+  RETURN similarity;
+END;
+$$;
+
+-- Function to calculate context similarity between two users
+CREATE OR REPLACE FUNCTION calculate_context_similarity(
+  user1_id UUID,
+  user2_id UUID
+)
+RETURNS FLOAT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  similarity FLOAT;
+BEGIN
+  -- Calculate similarity based on user_context data
+  WITH user1_contexts AS (
+    SELECT entity_type, COUNT(*) as count
+    FROM user_context
+    WHERE user_id = user1_id
+    GROUP BY entity_type
+  ),
+  user2_contexts AS (
+    SELECT entity_type, COUNT(*) as count
+    FROM user_context
+    WHERE user_id = user2_id
+    GROUP BY entity_type
+  ),
+  common_contexts AS (
+    SELECT 
+      u1.entity_type, 
+      u1.count as u1_count, 
+      u2.count as u2_count,
+      LEAST(u1.count, u2.count)::float / GREATEST(u1.count, u2.count)::float as context_similarity
+    FROM user1_contexts u1
+    JOIN user2_contexts u2 ON u1.entity_type = u2.entity_type
+  )
+  SELECT COALESCE(
+    CASE 
+      WHEN (SELECT COUNT(*) FROM user1_contexts) = 0 OR (SELECT COUNT(*) FROM user2_contexts) = 0 THEN 0
+      ELSE (SELECT AVG(context_similarity) FROM common_contexts)
+    END, 0) INTO similarity;
+  
+  RETURN similarity;
+END;
+$$;
+
+-- Function to generate user recommendations
+CREATE OR REPLACE FUNCTION generate_user_recommendations(
+  p_user_id UUID,
+  p_limit INT DEFAULT 10
+)
+RETURNS TABLE (
+  recommended_user_id UUID,
+  display_name TEXT,
+  bio TEXT,
+  profile_picture_url TEXT,
+  match_score FLOAT,
+  mood_similarity FLOAT,
+  activity_similarity FLOAT,
+  context_similarity FLOAT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Delete existing recommendations that haven't been acted upon
+  DELETE FROM user_recommendations
+  WHERE user_id = p_user_id
+  AND is_approved = FALSE 
+  AND is_rejected = FALSE;
+  
+  -- Insert new recommendations
+  INSERT INTO user_recommendations (
+    user_id, 
+    recommended_user_id, 
+    match_score, 
+    mood_similarity, 
+    activity_similarity, 
+    context_similarity
+  )
+  SELECT 
+    p_user_id,
+    up.user_id,
+    (
+      (calculate_mood_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'mood_match_weight')::float, 0.5)) +
+      (calculate_activity_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'activity_match_weight')::float, 0.3)) +
+      (calculate_context_similarity(p_user_id, up.user_id) * COALESCE((p.connection_preferences->>'context_match_weight')::float, 0.2))
+    ) as match_score,
+    calculate_mood_similarity(p_user_id, up.user_id) as mood_similarity,
+    calculate_activity_similarity(p_user_id, up.user_id) as activity_similarity,
+    calculate_context_similarity(p_user_id, up.user_id) as context_similarity
+  FROM user_profiles up
+  JOIN user_profiles p ON p.user_id = p_user_id
+  WHERE 
+    up.is_discoverable = TRUE
+    AND up.user_id != p_user_id
+    -- Only include users that share at least some data
+    AND (
+      (up.shared_mood_data = TRUE) OR 
+      (up.shared_activity_data = TRUE) OR 
+      (up.shared_context_data = TRUE)
+    )
+    -- Don't include users that are already connected or have pending connections
+    AND NOT EXISTS (
+      SELECT 1 FROM user_connections uc
+      WHERE (uc.user1_id = p_user_id AND uc.user2_id = up.user_id)
+      OR (uc.user1_id = up.user_id AND uc.user2_id = p_user_id)
+    )
+    -- Don't include users that have been rejected
+    AND NOT EXISTS (
+      SELECT 1 FROM user_recommendations ur
+      WHERE ur.user_id = p_user_id 
+      AND ur.recommended_user_id = up.user_id
+      AND ur.is_rejected = TRUE
+    )
+  ORDER BY match_score DESC
+  LIMIT p_limit;
+  
+  -- Return the recommendations with user profile information
+  RETURN QUERY
+  SELECT 
+    ur.recommended_user_id,
+    up.display_name,
+    up.bio,
+    up.profile_picture_url,
+    ur.match_score,
+    ur.mood_similarity,
+    ur.activity_similarity,
+    ur.context_similarity
+  FROM user_recommendations ur
+  JOIN user_profiles up ON ur.recommended_user_id = up.user_id
+  WHERE ur.user_id = p_user_id
+  AND ur.is_approved = FALSE
+  AND ur.is_rejected = FALSE
+  ORDER BY ur.match_score DESC;
+END;
+$$;
+
+-- Function to get user connections
+CREATE OR REPLACE FUNCTION get_user_connections(
+  p_user_id UUID,
+  p_status TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  connection_id UUID,
+  connected_user_id UUID,
+  display_name TEXT,
+  bio TEXT,
+  profile_picture_url TEXT,
+  connection_status TEXT,
+  is_initiator BOOLEAN,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  unread_messages BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    uc.id as connection_id,
+    CASE 
+      WHEN uc.user1_id = p_user_id THEN uc.user2_id 
+      ELSE uc.user1_id 
+    END as connected_user_id,
+    up.display_name,
+    up.bio,
+    up.profile_picture_url,
+    uc.connection_status,
+    uc.initiator_id = p_user_id as is_initiator,
+    uc.created_at,
+    uc.updated_at,
+    (
+      SELECT COUNT(*)
+      FROM connection_messages cm
+      WHERE cm.connection_id = uc.id
+      AND cm.sender_id != p_user_id
+      AND cm.is_read = FALSE
+    ) as unread_messages
+  FROM user_connections uc
+  JOIN user_profiles up ON (
+    CASE 
+      WHEN uc.user1_id = p_user_id THEN uc.user2_id 
+      ELSE uc.user1_id 
+    END = up.user_id
+  )
+  WHERE (uc.user1_id = p_user_id OR uc.user2_id = p_user_id)
+  AND (p_status IS NULL OR uc.connection_status = p_status)
+  ORDER BY uc.updated_at DESC;
+END;
+$$;
+
+-- Function to get connection messages
+CREATE OR REPLACE FUNCTION get_connection_messages(
+  p_connection_id UUID,
+  p_user_id UUID,
+  p_limit INT DEFAULT 50,
+  p_offset INT DEFAULT 0
+)
+RETURNS TABLE (
+  message_id UUID,
+  sender_id UUID,
+  is_self BOOLEAN,
+  content TEXT,
+  created_at TIMESTAMP WITH TIME ZONE,
+  is_read BOOLEAN
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Verify the user is part of this connection
+  IF NOT EXISTS (
+    SELECT 1 FROM user_connections uc
+    WHERE uc.id = p_connection_id
+    AND (uc.user1_id = p_user_id OR uc.user2_id = p_user_id)
+  ) THEN
+    RAISE EXCEPTION 'Connection not found or access denied';
+  END IF;
+  
+  -- Mark all messages as read
+  UPDATE connection_messages cm
+  SET is_read = TRUE
+  WHERE cm.connection_id = p_connection_id
+  AND cm.sender_id != p_user_id
+  AND cm.is_read = FALSE;
+  
+  -- Return messages
+  RETURN QUERY
+  SELECT 
+    cm.id as message_id,
+    cm.sender_id,
+    cm.sender_id = p_user_id as is_self,
+    cm.content,
+    cm.created_at,
+    cm.is_read
+  FROM connection_messages cm
+  WHERE cm.connection_id = p_connection_id
+  ORDER BY cm.created_at DESC
+  LIMIT p_limit
+  OFFSET p_offset;
+END;
+$$;
+
+-- Function to request a connection with another user
+CREATE OR REPLACE FUNCTION request_connection(
+  p_user_id UUID,
+  p_recommended_user_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  connection_id UUID;
+BEGIN
+  -- Check if the recommendation exists
+  IF NOT EXISTS (
+    SELECT 1 FROM user_recommendations
+    WHERE user_id = p_user_id
+    AND recommended_user_id = p_recommended_user_id
+  ) THEN
+    -- Create a new recommendation if it doesn't exist
+    INSERT INTO user_recommendations (
+      user_id, 
+      recommended_user_id, 
+      match_score, 
+      mood_similarity, 
+      activity_similarity, 
+      context_similarity
+    ) VALUES (
+      p_user_id,
+      p_recommended_user_id,
+      0.5, -- Default match score
+      calculate_mood_similarity(p_user_id, p_recommended_user_id),
+      calculate_activity_similarity(p_user_id, p_recommended_user_id),
+      calculate_context_similarity(p_user_id, p_recommended_user_id)
+    );
+  END IF;
+  
+  -- Mark the recommendation as approved
+  UPDATE user_recommendations
+  SET is_approved = TRUE
+  WHERE user_id = p_user_id
+  AND recommended_user_id = p_recommended_user_id;
+  
+  -- Check if a connection already exists
+  SELECT id INTO connection_id
+  FROM user_connections
+  WHERE (user1_id = p_user_id AND user2_id = p_recommended_user_id)
+  OR (user1_id = p_recommended_user_id AND user2_id = p_user_id);
+  
+  -- Create new connection if it doesn't exist
+  IF connection_id IS NULL THEN
+    INSERT INTO user_connections (
+      user1_id,
+      user2_id,
+      connection_status,
+      initiator_id
+    ) VALUES (
+      LEAST(p_user_id, p_recommended_user_id),
+      GREATEST(p_user_id, p_recommended_user_id),
+      'pending',
+      p_user_id
+    )
+    RETURNING id INTO connection_id;
+  END IF;
+  
+  RETURN connection_id;
+END;
+$$;
+
+-- Function to accept a connection request
+CREATE OR REPLACE FUNCTION accept_connection(
+  p_user_id UUID,
+  p_connection_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  connection_exists BOOLEAN;
+BEGIN
+  -- Check if the connection exists and the user is the recipient
+  SELECT EXISTS (
+    SELECT 1 FROM user_connections
+    WHERE id = p_connection_id
+    AND (
+      (user1_id = p_user_id AND initiator_id != p_user_id) OR
+      (user2_id = p_user_id AND initiator_id != p_user_id)
+    )
+    AND connection_status = 'pending'
+  ) INTO connection_exists;
+  
+  IF NOT connection_exists THEN
+    RAISE EXCEPTION 'Connection request not found or already processed';
+  END IF;
+  
+  -- Update the connection status
+  UPDATE user_connections
+  SET 
+    connection_status = 'connected',
+    updated_at = NOW()
+  WHERE id = p_connection_id;
+  
+  -- Also mark any recommendations between these users as approved
+  WITH connection_users AS (
+    SELECT 
+      user1_id, 
+      user2_id 
+    FROM user_connections 
+    WHERE id = p_connection_id
+  )
+  UPDATE user_recommendations ur
+  SET is_approved = TRUE
+  FROM connection_users cu
+  WHERE (ur.user_id = cu.user1_id AND ur.recommended_user_id = cu.user2_id)
+  OR (ur.user_id = cu.user2_id AND ur.recommended_user_id = cu.user1_id);
+  
+  RETURN TRUE;
+END;
+$$;
+
+-- Function to reject a connection or recommendation
+CREATE OR REPLACE FUNCTION reject_connection(
+  p_user_id UUID,
+  p_connection_id UUID DEFAULT NULL,
+  p_recommended_user_id UUID DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Handle rejecting a connection request
+  IF p_connection_id IS NOT NULL THEN
+    -- Check if the connection exists and the user is part of it
+    IF NOT EXISTS (
+      SELECT 1 FROM user_connections
+      WHERE id = p_connection_id
+      AND (user1_id = p_user_id OR user2_id = p_user_id)
+      AND connection_status = 'pending'
+    ) THEN
+      RAISE EXCEPTION 'Connection request not found or already processed';
+    END IF;
+    
+    -- Update the connection status
+    UPDATE user_connections
+    SET 
+      connection_status = 'rejected',
+      updated_at = NOW()
+    WHERE id = p_connection_id;
+    
+    -- Also mark any recommendations between these users as rejected
+    WITH connection_users AS (
+      SELECT 
+        user1_id, 
+        user2_id 
+      FROM user_connections 
+      WHERE id = p_connection_id
+    )
+    UPDATE user_recommendations ur
+    SET is_rejected = TRUE
+    FROM connection_users cu
+    WHERE (ur.user_id = cu.user1_id AND ur.recommended_user_id = cu.user2_id)
+    OR (ur.user_id = cu.user2_id AND ur.recommended_user_id = cu.user1_id);
+  
+  -- Handle rejecting a recommendation
+  ELSIF p_recommended_user_id IS NOT NULL THEN
+    -- Mark the recommendation as rejected
+    UPDATE user_recommendations
+    SET is_rejected = TRUE
+    WHERE user_id = p_user_id
+    AND recommended_user_id = p_recommended_user_id;
+  ELSE
+    RAISE EXCEPTION 'Either connection_id or recommended_user_id must be provided';
+  END IF;
+  
+  RETURN TRUE;
+END;
+$$;
+
+-- Grant necessary permissions for all new functions
+GRANT EXECUTE ON FUNCTION calculate_mood_similarity TO authenticated;
+GRANT EXECUTE ON FUNCTION calculate_activity_similarity TO authenticated;
+GRANT EXECUTE ON FUNCTION calculate_context_similarity TO authenticated;
+GRANT EXECUTE ON FUNCTION generate_user_recommendations TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_connections TO authenticated;
+GRANT EXECUTE ON FUNCTION get_connection_messages TO authenticated;
+GRANT EXECUTE ON FUNCTION request_connection TO authenticated;
+GRANT EXECUTE ON FUNCTION accept_connection TO authenticated;
+GRANT EXECUTE ON FUNCTION reject_connection TO authenticated;
+
+-- Grant necessary table permissions
+GRANT SELECT, INSERT, UPDATE ON user_profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON user_recommendations TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON user_connections TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON connection_messages TO authenticated; 
