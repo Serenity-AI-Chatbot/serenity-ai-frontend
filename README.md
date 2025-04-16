@@ -340,7 +340,45 @@ A table containing the following fields:
 - `song TEXT`: Link to a related song.
 - `created_at TIMESTAMP WITH TIME ZONE`: The timestamp when the entry was created.
 
-## 🔒 Security Features
+### 7. generate_user_recommendations()
+**Function:** `generate_user_recommendations`
+
+**Description:**
+Generates personalized user connection recommendations based on mood patterns, activity preferences, and contextual similarities. This function powers the "Discover People" feature, helping users find and connect with others who have similar emotional patterns and wellness journeys.
+
+**Parameters:**
+- `p_user_id UUID`: The unique identifier of the user receiving recommendations.
+- `p_limit INT DEFAULT 10`: (Optional) The maximum number of recommendations to return.
+
+**Returns:**
+A table containing the following fields:
+- `recommended_user_id UUID`: The unique identifier of the recommended user.
+- `display_name TEXT`: The display name of the recommended user.
+- `bio TEXT`: The bio description of the recommended user.
+- `profile_picture_url TEXT`: URL to the recommended user's profile picture.
+- `match_score FLOAT`: Overall compatibility score (0-1) combining all similarity factors.
+- `mood_similarity FLOAT`: Similarity score (0-1) based on mood patterns between users.
+- `activity_similarity FLOAT`: Similarity score (0-1) based on activity preferences and history.
+- `context_similarity FLOAT`: Similarity score (0-1) based on shared contexts and interests.
+
+**Algorithm:**
+1. First removes any existing unprocessed recommendations (those not yet approved or rejected)
+2. Calculates weighted similarity scores based on three components:
+   - Mood similarity: Based on mood tags from journal entries
+   - Activity similarity: Based on completed wellness activities and preferences
+   - Context similarity: Based on shared contexts, interests, and patterns
+3. Applies user-configurable weights to these similarity components
+4. Filters recommendations to exclude:
+   - Users who aren't discoverable
+   - Users who don't share relevant data
+   - Already connected users or pending connections
+   - Previously rejected recommendations
+5. Implements safeguards to prevent duplicate recommendations
+6. Returns the top matches sorted by overall compatibility score
+
+This function is designed with privacy in mind, only matching users who have explicitly opted in to discovery and have chosen to share relevant data components.
+
+## �� Security Features
 
 ### Row Level Security (RLS)
 - Enabled on all main tables:
