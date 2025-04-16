@@ -126,8 +126,7 @@ export function JournalEntry() {
       const decoder = new TextDecoder();
       
       let done = false;
-      let processedText = "";
-      let actualResponse = "";
+      let accumulatedResponse = "";
       
       while (!done) {
         const { value, done: doneReading } = await reader.read();
@@ -135,46 +134,24 @@ export function JournalEntry() {
         
         if (value) {
           const text = decoder.decode(value);
-          processedText += text;
-          
-          // Extract meaningful content from the processed text
-          let extractedContent = "";
-          const lines = processedText.split('\n');
+          const lines = text.split('\n');
           
           for (const line of lines) {
             if (!line.trim()) continue;
             
-            // Handle lines starting with "data:"
             if (line.startsWith("data:")) {
               try {
-                // Try to parse the JSON after "data:"
                 const jsonStr = line.substring(5).trim();
                 const data = JSON.parse(jsonStr);
                 
-                // Extract text from the data object
                 if (data.text && typeof data.text === "string") {
-                  const cleanText = data.text.replace(/\\"/g, '"').replace(/\\n/g, '\n');
-                  if (cleanText.trim() !== "") {
-                    extractedContent = cleanText;
-                  }
+                  accumulatedResponse += data.text;
+                  setChatResponse(accumulatedResponse);
                 }
               } catch (e) {
-                // If we can't parse the JSON, extract content between quotes if it looks like text
-                const rawText = line.substring(5).trim();
-                if (rawText.includes('"text":"') && rawText.includes('","chatId"')) {
-                  const textMatch = rawText.match(/"text":"([^"]*)"/);
-                  if (textMatch && textMatch[1]) {
-                    extractedContent = textMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
-                  }
-                }
+                console.error("Error parsing JSON:", e);
               }
             }
-          }
-          
-          // Only update if we have actual content
-          if (extractedContent && extractedContent.trim() !== "") {
-            actualResponse = extractedContent;
-            setChatResponse(actualResponse);
           }
         }
       }
