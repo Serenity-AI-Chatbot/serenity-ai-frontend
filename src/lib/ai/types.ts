@@ -26,6 +26,7 @@ export interface JournalEntry {
   nearby_places?: Record<string, any>;
   sentences?: string[];
   user_id?: string;
+  is_processing?: boolean;
 }
 
 export interface JournalStats {

@@ -26,7 +26,13 @@ CREATE TABLE journals (
     
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    tags TEXT[]
+    tags TEXT[],
+    
+    -- Processing status
+    is_processing BOOLEAN DEFAULT FALSE,
+    
+    -- Location data
+    location TEXT
 );
 
 -- Activities Catalog

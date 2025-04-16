@@ -59,6 +59,7 @@ import {
   Engine, 
   VoiceId 
 } from "@aws-sdk/client-polly";
+import { useRouter } from "next/navigation";
 
 const SUGGESTED_PROMPTS = [
   "I'm feeling anxious about work. Any tips?",
@@ -92,7 +93,11 @@ const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
 const AWS_ACCESS_KEY_ID = process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID;
 const AWS_SECRET_ACCESS_KEY = process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY;
 
-export default function ChatComponent() {
+interface ChatComponentProps {
+  initialChatId?: string;
+}
+
+export default function ChatComponent({ initialChatId }: ChatComponentProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -105,7 +110,7 @@ export default function ChatComponent() {
   const [voiceRecognitionProvider, setVoiceRecognitionProvider] = useState<VoiceRecognitionProvider>("webspeech");
   const [pollyVoice, setPollyVoice] = useState("Joanna");
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(initialChatId || null);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,6 +124,8 @@ export default function ChatComponent() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
+  const router = useRouter();
+  const [isNewChat, setIsNewChat] = useState(initialChatId ? false : true);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -132,14 +139,24 @@ export default function ChatComponent() {
     fetchUserChats();
   }, []);
 
-  // Load messages when a chat is selected
+  // Load messages when a chat is selected or when initialChatId changes
   useEffect(() => {
     if (currentChatId) {
       fetchChatMessages(currentChatId);
+      setIsNewChat(false);
     } else {
       setMessages([]);
+      setIsNewChat(true);
     }
   }, [currentChatId]);
+
+  // Set currentChatId from initialChatId when component mounts or initialChatId changes
+  useEffect(() => {
+    if (initialChatId) {
+      setCurrentChatId(initialChatId);
+      setIsNewChat(false);
+    }
+  }, [initialChatId]);
 
   const fetchUserChats = async () => {
     setIsLoadingChats(true);
@@ -151,8 +168,8 @@ export default function ChatComponent() {
       const data = await response.json();
       setChats(data);
       
-      // If there are chats, select the most recent one
-      if (data.length > 0) {
+      // If initialChatId is not set and there are chats, select the most recent one
+      if (!initialChatId && !currentChatId && data.length > 0) {
         setCurrentChatId(data[0].id);
       }
     } catch (error) {
@@ -223,7 +240,11 @@ export default function ChatComponent() {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    
+    // Use a new messages array if this is a new chat
+    const currentMessages = isNewChat ? [userMessage] : [...messages, userMessage];
+    
+    setMessages(currentMessages);
     setInput("");
     setIsTyping(true);
 
@@ -234,7 +255,7 @@ export default function ChatComponent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          messages: [...messages, userMessage],
+          messages: currentMessages,
           chatId: currentChatId
         }),
       });
@@ -249,6 +270,7 @@ export default function ChatComponent() {
       }
 
       let assistantMessage = "";
+      // Update without refreshing the whole list
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       while (true) {
@@ -263,6 +285,7 @@ export default function ChatComponent() {
               if (jsonData.text) {
                 assistantMessage += jsonData.text;
                 setMessages((prev: any) => {
+                  // Get the last message (which is the assistant's partial response)
                   const updatedMessages = [
                     ...prev.slice(0, -1),
                     { role: "assistant", content: assistantMessage },
@@ -271,9 +294,12 @@ export default function ChatComponent() {
                 });
                 
                 // Update current chat ID if this is a new chat
-                if (jsonData.chatId && !currentChatId) {
+                if (jsonData.chatId && isNewChat) {
                   setCurrentChatId(jsonData.chatId);
-                  // Refresh the chat list
+                  setIsNewChat(false);
+                  // Navigate to the individual chat page without forcing a refresh
+                  window.history.pushState({}, "", `/chat/${jsonData.chatId}`);
+                  // Refresh the chat list without forcing a navigation
                   fetchUserChats();
                 }
               }
@@ -322,15 +348,39 @@ export default function ChatComponent() {
   const handleClearChat = () => {
     setMessages([]);
     setCurrentChatId(null);
+    setIsNewChat(true);
+    router.push('/chat');
   };
 
   const handleNewChat = () => {
+    // First clear messages and set currentChatId to null
     setMessages([]);
     setCurrentChatId(null);
+    setIsNewChat(true);
+    
+    // Close any open mobile menus
+    setIsChatListOpen(false);
+    setIsSettingsOpen(false);
+    
+    // Then navigate to the base chat page
+    router.push('/chat');
   };
 
   const handleSelectChat = (chatId: string) => {
-    setCurrentChatId(chatId);
+    if (chatId !== currentChatId) {
+      // Set current chat ID and mark as not a new chat
+      setCurrentChatId(chatId);
+      setIsNewChat(false);
+      
+      // Use history API to avoid full page refresh
+      window.history.pushState({}, "", `/chat/${chatId}`);
+      
+      // Fetch messages for this chat
+      fetchChatMessages(chatId);
+      
+      // Close mobile chat list if open
+      setIsChatListOpen(false);
+    }
   };
 
   const deleteChat = async () => {
@@ -564,6 +614,8 @@ export default function ChatComponent() {
               size="sm"
               onClick={() => {
                 if (currentChatId) {
+                  // Use history API to avoid full page refresh
+                  window.history.pushState({}, "", `/chat/zen/${currentChatId}`);
                   window.location.href = `/chat/zen/${currentChatId}`;
                 }
               }}
@@ -626,7 +678,11 @@ export default function ChatComponent() {
                 {currentChatId && (
                   <DropdownMenuItem 
                     onClick={() => {
-                      window.location.href = `/chat/zen/${currentChatId}`;
+                      if (currentChatId) {
+                        // Use history API to avoid full page refresh
+                        window.history.pushState({}, "", `/chat/zen/${currentChatId}`);
+                        window.location.href = `/chat/zen/${currentChatId}`;
+                      }
                     }}
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -982,8 +1038,12 @@ export default function ChatComponent() {
           <SheetFooter className="flex-col border-t border-gray-200 dark:border-gray-800 pt-4 mt-auto">
             <Button 
               onClick={() => {
-                handleNewChat();
+                // Clear the current chat before creating a new one
+                setMessages([]);
+                setCurrentChatId(null);
+                setIsNewChat(true);
                 setIsChatListOpen(false);
+                router.push('/chat');
               }}
               className="w-full bg-emerald-500 hover:bg-emerald-600"
             >
@@ -1016,7 +1076,11 @@ export default function ChatComponent() {
             {currentChatId && (
               <Button 
                 onClick={() => {
-                  window.location.href = `/chat/zen/${currentChatId}`;
+                  if (currentChatId) {
+                    // Use history API to avoid full page refresh
+                    window.history.pushState({}, "", `/chat/zen/${currentChatId}`);
+                    window.location.href = `/chat/zen/${currentChatId}`;
+                  }
                 }}
                 className="w-full justify-start"
                 variant="outline"
@@ -1027,7 +1091,10 @@ export default function ChatComponent() {
             )}
             
             <Button 
-              onClick={handleNewChat}
+              onClick={() => {
+                handleNewChat();
+                setIsSettingsOpen(false);
+              }}
               className="w-full justify-start"
               variant="outline"
             >

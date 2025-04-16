@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronRight, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -17,6 +17,7 @@ interface Journal {
   sentences: string[];
   created_at: string;
   tags: string[];
+  is_processing?: boolean;
 }
 
 export function JournalHistory() {
@@ -24,18 +25,20 @@ export function JournalHistory() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchJournals() {
-      try {
-        const response = await fetch('/api/journal');
-        const data = await response.json();
-        setJournals(data);
-      } catch (error) {
-        console.error('Error fetching journals:', error);
-      } finally {
-        setLoading(false);
-      }
+  async function fetchJournals() {
+    try {
+      const response = await fetch('/api/journal');
+      const data = await response.json();
+      setJournals(data);
+    } catch (error) {
+      console.error('Error fetching journals:', error);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  // Initial fetch
+  useEffect(() => {
     fetchJournals();
   }, []);
 
@@ -74,7 +77,7 @@ export function JournalHistory() {
           >
             <div className="flex justify-between items-start mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{journal.mood_tags[0] || '😊'}</span>
+                <span className="text-lg">{journal.mood_tags?.[0] || '😊'}</span>
                 <span className="text-sm text-gray-600 dark:text-emerald-500/70">
                   {new Date(journal.created_at).toLocaleDateString('en-US', {
                     weekday: 'long',
@@ -83,10 +86,16 @@ export function JournalHistory() {
                     day: 'numeric',
                   })}
                 </span>
+                {journal.is_processing && (
+                  <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Processing
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
-                  {journal.mood_tags.slice(0, 2).map((tag, index) => (
+                  {journal.mood_tags?.slice(0, 2).map((tag, index) => (
                     <span
                       key={index}
                       className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 text-sm rounded-full"
@@ -105,7 +114,7 @@ export function JournalHistory() {
               <p className="text-gray-700 dark:text-emerald-500/70 line-clamp-2">
                 {journal.summary || journal.content}
               </p>
-              {journal.keywords.length > 0 && (
+              {journal.keywords?.length > 0 && (
                 <div className="flex gap-1 flex-wrap mt-2">
                   {journal.keywords.slice(0, 3).map((keyword, index) => (
                     <span
