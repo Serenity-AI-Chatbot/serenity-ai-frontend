@@ -73,8 +73,20 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
   const [journal, setJournal] = useState(initialJournal);
   const [isRefetching, setIsRefetching] = useState(false);
   
+  // Determine if journal is still processing based on missing AI-generated content
+  const isProcessing = journal.is_processing || 
+    (!journal.summary && 
+     (!journal.keywords || journal.keywords.length === 0) && 
+     (!journal.nearbyPlaces?.places || journal.nearbyPlaces.places.length === 0) && 
+     (!journal.latestArticles?.articles || journal.latestArticles.articles.length === 0));
+  
   const suggestions = getJournalSuggestions(journal);
   const videoId = getYouTubeVideoId(journal.song);
+
+  console.log("===============")
+  console.log(journal)
+  console.log("isProcessing:", isProcessing)
+  console.log("===============")
 
   const fetchJournal = async () => {
     try {
@@ -93,15 +105,15 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
 
   // Set up auto-refresh if journal is processing
   useEffect(() => {
-    if (journal.is_processing) {
-      const intervalId = setInterval(fetchJournal, 10000); // Refetch every 10 seconds
+    if (isProcessing) {
+      const intervalId = setInterval(fetchJournal, 3000); // Refetch every 3 seconds
       
       // Cleanup interval on unmount
       return () => {
         clearInterval(intervalId);
       };
     }
-  }, [journal.is_processing, journal.id]);
+  }, [isProcessing, journal.id]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -115,7 +127,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
           Back to Journal List
         </button>
         
-        {journal.is_processing && (
+        {isProcessing && (
           <button 
             onClick={fetchJournal}
             disabled={isRefetching}
@@ -128,7 +140,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
       </div>
 
       {/* Processing Banner */}
-      {journal.is_processing && (
+      {isProcessing && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 flex flex-col items-center justify-center text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
           <h3 className="text-xl font-medium text-blue-700 mb-2">Your journal is being processed</h3>
@@ -154,21 +166,58 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                   day: "numeric",
                 })}
               </span>
+              {isProcessing && (
+                <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing
+                </span>
+              )}
             </div>
-            {!journal.is_processing && journal.mood && (
+            {!isProcessing && journal.mood && (
               <span className="px-4 py-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 rounded-full flex items-center gap-2">
                 {journal.mood}
+              </span>
+            )}
+            {isProcessing && (
+              <span className="px-4 py-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 rounded-full flex items-center gap-2">
+                No mood recorded
               </span>
             )}
           </div>
 
           {journal.title && (
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-500 mb-4">
-              {journal.title}
-            </h1>
+            <div className="flex items-center gap-2 mb-4">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-500">
+                {journal.title}
+              </h1>
+              {isProcessing && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing
+                </span>
+              )}
+            </div>
           )}
 
-          {!journal.is_processing && journal.summary && (
+          {!journal.title && isProcessing && (
+            <div className="mb-4">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <svg className="animate-spin -ml-1 mr-2 h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing
+              </span>
+            </div>
+          )}
+
+          {!isProcessing && journal.summary && (
             <div className="mb-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
               <p className="text-gray-700 dark:text-emerald-400 italic">
                 {journal.summary}
@@ -180,7 +229,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
             {journal.entry}
           </p>
 
-          {!journal.is_processing && journal.keywords && journal.keywords.length > 0 && (
+          {!isProcessing && journal.keywords && journal.keywords.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {journal.keywords.map((keyword, index) => (
                 <span
@@ -196,7 +245,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
         </CardContent>
       </Card>
 
-      {journal.is_processing ? (
+      {isProcessing ? (
         // Placeholder cards for processing state
         <>
           <Card>
@@ -207,9 +256,16 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                   Suggested Song
                 </h2>
               </div>
-              <div className="animate-pulse space-y-4">
-                <div className="h-48 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full"></div>
-                <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-1/3"></div>
+              <div className="space-y-4">
+                <div className="h-48 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full relative flex items-center justify-center animate-pulse">
+                  {/* Placeholder image for meditation theme */}
+                  <div className="absolute inset-0 bg-amber-100/50 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                    <span className="text-amber-800 dark:text-amber-300 text-lg">
+                      Finding the perfect song for your meditation...
+                    </span>
+                  </div>
+                </div>
+                <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-1/3 animate-pulse"></div>
               </div>
             </CardContent>
           </Card>
@@ -222,13 +278,13 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                   Nearby Places
                 </h2>
               </div>
-              <div className="animate-pulse space-y-4">
+              <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="space-y-3">
-                      <div className="h-48 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-2/3"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-1/2"></div>
+                    <div key={i} className="space-y-3 bg-gray-50 dark:bg-emerald-900/10 p-4 rounded-lg">
+                      <div className="h-32 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-2/3 animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-1/2 animate-pulse"></div>
                     </div>
                   ))}
                 </div>
@@ -244,9 +300,12 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                   Latest Articles
                 </h2>
               </div>
-              <div className="animate-pulse space-y-4">
+              <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-24 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full"></div>
+                  <div key={i} className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-emerald-500/20 rounded w-3/4 animate-pulse"></div>
+                    <div className="h-16 bg-gray-200 dark:bg-emerald-500/20 rounded-lg w-full animate-pulse"></div>
+                  </div>
                 ))}
               </div>
             </CardContent>
@@ -255,7 +314,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
       ) : (
         // Actual content when not processing
         <>
-          {videoId && (
+          {/* {!isProcessing && videoId && (
             <Card>
               <CardContent>
                 <div className="flex items-center gap-2 mb-4">
@@ -278,7 +337,7 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
                 </div>
               </CardContent>
             </Card>
-          )}
+          )} */}
           
           {/* Nearby places */}
           {suggestions.places.length > 0 && (

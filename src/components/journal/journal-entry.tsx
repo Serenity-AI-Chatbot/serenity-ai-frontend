@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
-import { Pencil, Save, Mic, MapPin } from "lucide-react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { Pencil, Save, Mic, MapPin, MessageCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -33,6 +33,9 @@ export function JournalEntry() {
   const [location, setLocation] = useState<LocationData | null>(null)
   const [locationError, setLocationError] = useState<string | null>(null)
   const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [chatResponse, setChatResponse] = useState("")
+  const [isStreaming, setIsStreaming] = useState(false)
+  const savedJournalRef = useRef<{title: string; content: string; id?: string}>({ title: "", content: "" })
   
   // Get geolocation when the user toggles the switch
   useEffect(() => {
@@ -89,6 +92,104 @@ export function JournalEntry() {
     );
   };
 
+  // Function to stream chat response
+  const streamChatResponse = async (journalContent: string, journalTitle: string) => {
+    try {
+      setIsStreaming(true);
+      setChatResponse("");
+      
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content: `This is my journal entry titled "${journalTitle}": ${journalContent}. Please provide a thoughtful reflection on what I've written.`
+            }
+          ]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get chat response");
+      }
+
+      if (!response.body) {
+        throw new Error("Response body is null");
+      }
+
+      // Handle the stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let done = false;
+      let processedText = "";
+      let actualResponse = "";
+      
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        
+        if (value) {
+          const text = decoder.decode(value);
+          processedText += text;
+          
+          // Extract meaningful content from the processed text
+          let extractedContent = "";
+          const lines = processedText.split('\n');
+          
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            // Handle lines starting with "data:"
+            if (line.startsWith("data:")) {
+              try {
+                // Try to parse the JSON after "data:"
+                const jsonStr = line.substring(5).trim();
+                const data = JSON.parse(jsonStr);
+                
+                // Extract text from the data object
+                if (data.text && typeof data.text === "string") {
+                  const cleanText = data.text.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+                  if (cleanText.trim() !== "") {
+                    extractedContent = cleanText;
+                  }
+                }
+              } catch (e) {
+                // If we can't parse the JSON, extract content between quotes if it looks like text
+                const rawText = line.substring(5).trim();
+                if (rawText.includes('"text":"') && rawText.includes('","chatId"')) {
+                  const textMatch = rawText.match(/"text":"([^"]*)"/);
+                  if (textMatch && textMatch[1]) {
+                    extractedContent = textMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+                  }
+                }
+              }
+            }
+          }
+          
+          // Only update if we have actual content
+          if (extractedContent && extractedContent.trim() !== "") {
+            actualResponse = extractedContent;
+            setChatResponse(actualResponse);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error streaming chat response:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response for your journal entry",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!entry.trim() || !title.trim()) {
@@ -123,6 +224,13 @@ export function JournalEntry() {
         throw new Error(data.error || "Failed to save journal entry")
       }
 
+      // Save the journal content for the chat
+      savedJournalRef.current = {
+        title,
+        content: entry,
+        id: data.id
+      };
+
       // Journal was created but is still processing
       if (data.status === "processing") {
         setIsProcessing(true)
@@ -131,6 +239,11 @@ export function JournalEntry() {
           description: "Your journal entry is being processed. This may take a few moments.",
           variant: "default",
         })
+        
+        // Start streaming chat response after a short delay
+        setTimeout(() => {
+          streamChatResponse(entry, title);
+        }, 500);
       } else {
         toast({
           title: "Success",
@@ -161,6 +274,11 @@ export function JournalEntry() {
     setEntry((prevEntry) => prevEntry + (prevEntry ? " " : "") + text)
   }, [])
 
+  const handleNewEntry = () => {
+    setIsProcessing(false);
+    setChatResponse("");
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-black rounded-lg shadow-lg">
       <div className="flex items-center gap-2 mb-6">
@@ -169,23 +287,55 @@ export function JournalEntry() {
       </div>
 
       {isProcessing ? (
-        <div className="text-center py-8">
-          <div className="animate-pulse mb-4">
-            <div className="h-4 bg-emerald-200 rounded w-3/4 mx-auto mb-4"></div>
-            <div className="h-4 bg-emerald-200 rounded w-1/2 mx-auto"></div>
+        <div className="py-8">
+          <div className="mb-6 text-center">
+            <div className="animate-pulse mb-4">
+              <div className="h-4 bg-emerald-200 rounded w-3/4 mx-auto mb-4"></div>
+              <div className="h-4 bg-emerald-200 rounded w-1/2 mx-auto"></div>
+            </div>
+            <p className="text-emerald-600 dark:text-emerald-500">
+              Your journal entry is being processed...
+            </p>
           </div>
-          <p className="text-emerald-600 dark:text-emerald-500">
-            Your journal entry is being processed...
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            This may take a few moments. You can continue using the app.
-          </p>
-          <button
-            onClick={() => setIsProcessing(false)}
-            className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
-          >
-            New Entry
-          </button>
+          
+          {/* Chat response section */}
+          <div className={`mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-all duration-300 ${chatResponse || isStreaming ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0 overflow-hidden'}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <MessageCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="font-medium text-emerald-700 dark:text-emerald-400">
+                AI Reflection
+              </h3>
+            </div>
+            
+            <div className="text-gray-800 dark:text-emerald-300 whitespace-pre-line min-h-[100px] prose prose-emerald prose-sm max-w-none">
+              {chatResponse ? (
+                <p>{chatResponse}</p>
+              ) : isStreaming ? (
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center gap-1">
+                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse delay-150"></div>
+                    <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse delay-300"></div>
+                  </div>
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    Thinking about your journal...
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              You can continue using the app.
+            </p>
+            <button
+              onClick={handleNewEntry}
+              className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
+            >
+              New Entry
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
