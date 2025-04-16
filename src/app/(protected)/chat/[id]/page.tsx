@@ -7,10 +7,10 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  params: Promise<{ chatId: string }>;
+  params: Promise<{ id: string }>;
 }
 
 export default async function ChatPage({ params }: PageProps) {
-  const { chatId } = await params;
-  return <ChatComponent initialChatId={chatId} />;
+  const { id } = await params;
+  return <ChatComponent initialChatId={id} />;
 } 

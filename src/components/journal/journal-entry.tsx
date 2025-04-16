@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Pencil, Save, Mic, MapPin, MessageCircle } from "lucide-react"
+import { Pencil, Save, Mic, MapPin, MessageCircle, ArrowRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { AIVoiceInput } from "@/components/journal/ai-voice-input"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface LocationData {
   latitude: number;
@@ -23,6 +24,7 @@ interface LocationData {
 
 export function JournalEntry() {
   const { toast } = useToast()
+  const router = useRouter()
   const [entry, setEntry] = useState("")
   const [title, setTitle] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -35,6 +37,7 @@ export function JournalEntry() {
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [chatResponse, setChatResponse] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const savedJournalRef = useRef<{title: string; content: string; id?: string}>({ title: "", content: "" })
   
   // Get geolocation when the user toggles the switch
@@ -92,11 +95,12 @@ export function JournalEntry() {
     );
   };
 
-  // Function to stream chat response
+  // Updated function to stream chat response that captures the chat ID
   const streamChatResponse = async (journalContent: string, journalTitle: string) => {
     try {
       setIsStreaming(true);
       setChatResponse("");
+      setCurrentChatId(null);
       
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -148,6 +152,11 @@ export function JournalEntry() {
                   accumulatedResponse += data.text;
                   setChatResponse(accumulatedResponse);
                 }
+                
+                // Capture the chat ID from the response
+                if (data.chatId && !currentChatId) {
+                  setCurrentChatId(data.chatId);
+                }
               } catch (e) {
                 console.error("Error parsing JSON:", e);
               }
@@ -164,6 +173,19 @@ export function JournalEntry() {
       });
     } finally {
       setIsStreaming(false);
+    }
+  };
+
+  // Function to continue the conversation
+  const continueChat = () => {
+    if (currentChatId) {
+      router.push(`/chat/${currentChatId}`);
+    } else {
+      toast({
+        title: "Error",
+        description: "Cannot continue conversation, chat ID not found",
+        variant: "destructive",
+      });
     }
   };
 
@@ -300,6 +322,20 @@ export function JournalEntry() {
                 </div>
               ) : null}
             </div>
+
+            {/* Add Talk more button when chat response is complete */}
+            {chatResponse && !isStreaming && currentChatId && (
+              <div className="mt-4">
+                <Button 
+                  onClick={continueChat}
+                  variant="outline" 
+                  className="flex items-center gap-2 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-900/30"
+                >
+                  <span>Talk more about this</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
           
           <div className="mt-6 text-center">
@@ -432,4 +468,3 @@ export function JournalEntry() {
     </div>
   )
 }
-

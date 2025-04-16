@@ -152,9 +152,14 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
 
   // Set currentChatId from initialChatId when component mounts or initialChatId changes
   useEffect(() => {
+    console.log("initialChatId changed:", initialChatId);
+    
     if (initialChatId) {
+      console.log("Setting currentChatId and fetching messages for:", initialChatId);
       setCurrentChatId(initialChatId);
       setIsNewChat(false);
+      // Immediately fetch messages for this chat ID instead of waiting for the currentChatId effect
+      fetchChatMessages(initialChatId);
     } else {
       // If we're at the /chat route without an ID, ensure it's a new empty chat
       setCurrentChatId(null);
@@ -195,12 +200,20 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
   };
 
   const fetchChatMessages = async (chatId: string) => {
+    // Store the chatId we're fetching for to check later
+    const fetchForChatId = chatId;
+    
+    // Add a loading state for messages
+    setIsTyping(true);
+    console.log("Fetching messages for chat ID:", chatId);
+    
     try {
       const response = await fetch(`/api/chat/${chatId}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.log("Received chat messages:", data.length);
       
       // Transform messages to the expected format
       const formattedMessages = data.map((msg: any) => ({
@@ -211,7 +224,14 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
         created_at: msg.created_at
       }));
       
-      setMessages(formattedMessages);
+      // Only update messages if we're still on the same chat
+      // This prevents race conditions if the user switches chats quickly
+      if (fetchForChatId === currentChatId) {
+        console.log("Setting messages with length:", formattedMessages.length);
+        setMessages(formattedMessages);
+      } else {
+        console.log("Chat ID changed, not updating messages");
+      }
     } catch (error) {
       console.error("Error fetching chat messages:", error);
       toast({
@@ -219,6 +239,11 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
         description: "Failed to load messages",
         variant: "destructive",
       });
+    } finally {
+      // Only reset loading state if we're still on the same chat
+      if (fetchForChatId === currentChatId) {
+        setIsTyping(false);
+      }
     }
   };
 
@@ -882,7 +907,7 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
           {/* Chat messages */}
           <ScrollArea className="flex-1 p-4">
             <div className="max-w-3xl mx-auto space-y-6 pb-20 sm:pb-4">
-              {messages.length === 0 && (
+              {messages.length === 0 && !isTyping && (
                 <div className="text-center py-10 sm:py-20">
                   <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-4">Welcome to Serenity-AI</h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto px-4">
@@ -901,6 +926,15 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
                         {prompt}
                       </Button>
                     ))}
+                  </div>
+                </div>
+              )}
+              
+              {isTyping && messages.length === 0 && (
+                <div className="flex items-center justify-center py-10">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400">Loading conversation...</p>
                   </div>
                 </div>
               )}
@@ -946,7 +980,7 @@ export default function ChatComponent({ initialChatId }: ChatComponentProps) {
                 </div>
               ))}
               
-              {isTyping && (
+              {isTyping && messages.length > 0 && (
                 <div className="py-4">
                   <div className="max-w-3xl mx-auto">
                     <div className="flex justify-start">
