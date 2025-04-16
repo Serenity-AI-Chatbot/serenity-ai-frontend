@@ -1,9 +1,15 @@
 import {  requireAuth, supabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import https from 'https'
 
 // Initialize the Gemini model
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+
+// Create an HTTPS agent that skips certificate verification
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false
+})
 
 // Helper function for generating embeddings - updated to take full journal entry
 async function generateEmbedding(journalEntry: any): Promise<number[]> {
@@ -163,25 +169,45 @@ export async function POST(request: Request) {
     
     // Call Flask API to process the journal content asynchronously
     console.log(`📝 Sending request to Flask API: ${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal-async`);
-    fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal-async`, {
+    
+    const postData = JSON.stringify({ 
+      text: content,
+      journal_id: journal.id,
+      webhook_url: webhookUrl,
+      location: location ? location.placeName || `pune` : null
+    });
+
+    const url = new URL(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal-async`);
+    
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
       },
-      body: JSON.stringify({ 
-        text: content,
-        journal_id: journal.id,
-        webhook_url: webhookUrl,
-        location: location ? location.placeName || `pune` : null
-      })
-    }).then(response => {
-      console.log(`📝 Flask API responded with status: ${response.status}`);
-      return response.text();
-    }).then(text => {
-      console.log(`📝 Flask API response: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
-    }).catch(err => {
-      console.error('❌ Error sending request to Flask API:', err)
+      rejectUnauthorized: false
+    };
+
+    const req = https.request(options, (res) => {
+      console.log(`📝 Flask API responded with status: ${res.statusCode}`);
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        console.log(`📝 Flask API response: ${data.substring(0, 100)}${data.length > 100 ? '...' : ''}`);
+      });
     });
+
+    req.on('error', (err) => {
+      console.error('❌ Error sending request to Flask API:', err);
+    });
+
+    req.write(postData);
+    req.end();
 
     console.log(`📝 Journal creation completed, returning response to client`);
     return NextResponse.json({
