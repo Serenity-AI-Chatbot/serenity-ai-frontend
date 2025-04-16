@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { Pencil, Save, Mic } from "lucide-react"
+import { useState, useCallback, useEffect } from "react"
+import { Pencil, Save, Mic, MapPin } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -14,13 +14,80 @@ import {
 import { AIVoiceInput } from "@/components/journal/ai-voice-input"
 import { Button } from "@/components/ui/button"
 
+interface LocationData {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  placeName?: string;
+}
+
 export function JournalEntry() {
   const { toast } = useToast()
   const [entry, setEntry] = useState("")
   const [title, setTitle] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [isVoiceInputOpen, setIsVoiceInputOpen] = useState(false)
   const [voiceText, setVoiceText] = useState("")
+  const [useLocation, setUseLocation] = useState(false)
+  const [location, setLocation] = useState<LocationData | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
+  
+  // Get geolocation when the user toggles the switch
+  useEffect(() => {
+    if (useLocation && !location && !locationError) {
+      getLocation();
+    }
+  }, [useLocation]);
+  
+  const getLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      return;
+    }
+    
+    setIsGettingLocation(true);
+    setLocationError(null);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        // First, save the coordinates
+        const locationData: LocationData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        
+        // Try to get a place name using reverse geocoding
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}&zoom=18&addressdetails=1`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          const data = await response.json();
+          if (data && data.display_name) {
+            locationData.placeName = data.display_name;
+          }
+        } catch (error) {
+          console.error("Error getting place name:", error);
+          // We still have the coordinates, so we can continue
+        }
+        
+        setLocation(locationData);
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        setLocationError(
+          error.code === 1
+            ? "Please allow location access to use this feature"
+            : "Error getting your location"
+        );
+        setIsGettingLocation(false);
+        setUseLocation(false);
+      }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +112,7 @@ export function JournalEntry() {
         body: JSON.stringify({
           title,
           content: entry,
+          location: useLocation ? location : null,
         }),
       })
 
@@ -55,15 +123,27 @@ export function JournalEntry() {
         throw new Error(data.error || "Failed to save journal entry")
       }
 
-      toast({
-        title: "Success",
-        description: "Journal entry saved successfully!",
-        variant: "default",
-      })
+      // Journal was created but is still processing
+      if (data.status === "processing") {
+        setIsProcessing(true)
+        toast({
+          title: "Journal submitted",
+          description: "Your journal entry is being processed. This may take a few moments.",
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Success",
+          description: "Journal entry saved successfully!",
+          variant: "default",
+        })
+      }
 
       // Reset form
       setEntry("")
       setTitle("")
+      setLocation(null)
+      setUseLocation(false)
     } catch (error) {
       console.error("Error saving journal:", error)
       toast({
@@ -88,64 +168,140 @@ export function JournalEntry() {
         <h2 className="text-2xl font-semibold text-gray-900 dark:text-emerald-500">Daily Journal</h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
-            Title
-          </label>
-          <input
-            id="title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
-            placeholder="Give your entry a title..."
-          />
-        </div>
-
-        <div>
-          <label htmlFor="entry" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
-            Write your thoughts...
-          </label>
-          <div className="relative">
-            <textarea
-              id="entry"
-              rows={6}
-              value={entry}
-              onChange={(e) => setEntry(e.target.value)}
-              className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
-              placeholder="What's on your mind today?"
-            />
-            <Dialog open={isVoiceInputOpen} onOpenChange={setIsVoiceInputOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" variant="outline" size="icon" className="absolute bottom-2 right-2">
-                  <Mic className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Voice Input</DialogTitle>
-                  <DialogDescription>Speak to add text to your journal entry</DialogDescription>
-                </DialogHeader>
-                <AIVoiceInput onStart={() => setVoiceText("")} onStop={handleVoiceInput} />
-              </DialogContent>
-            </Dialog>
+      {isProcessing ? (
+        <div className="text-center py-8">
+          <div className="animate-pulse mb-4">
+            <div className="h-4 bg-emerald-200 rounded w-3/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-emerald-200 rounded w-1/2 mx-auto"></div>
           </div>
+          <p className="text-emerald-600 dark:text-emerald-500">
+            Your journal entry is being processed...
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            This may take a few moments. You can continue using the app.
+          </p>
+          <button
+            onClick={() => setIsProcessing(false)}
+            className="mt-4 px-4 py-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
+          >
+            New Entry
+          </button>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
+              Title
+            </label>
+            <input
+              id="title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+              placeholder="Give your entry a title..."
+            />
+          </div>
 
-        <span className="text-red-500 text-sm mt-2">
-          ⚠️ Voice input is supported only in the latest versions of Safari and Chrome browsers not supported in Brave.
-        </span>
+          <div>
+            <label htmlFor="entry" className="block text-sm font-medium text-gray-900 dark:text-emerald-500 mb-2">
+              Write your thoughts...
+            </label>
+            <div className="relative">
+              <textarea
+                id="entry"
+                rows={6}
+                value={entry}
+                onChange={(e) => setEntry(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-black border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-emerald-500 placeholder:text-gray-500 dark:placeholder:text-emerald-500/50"
+                placeholder="What's on your mind today?"
+              />
+              <Dialog open={isVoiceInputOpen} onOpenChange={setIsVoiceInputOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="outline" size="icon" className="absolute bottom-2 right-2">
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Voice Input</DialogTitle>
+                    <DialogDescription>Speak to add text to your journal entry</DialogDescription>
+                  </DialogHeader>
+                  <AIVoiceInput onStart={() => setVoiceText("")} onStop={handleVoiceInput} />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Save className="w-5 h-5" />
-          {isSubmitting ? "Saving..." : "Save Entry"}
-        </button>
-      </form>
+          {/* Location Toggle */}
+          <div className="flex items-center space-x-2">
+            <div className="relative inline-flex items-center cursor-pointer" onClick={() => !isGettingLocation && setUseLocation(!useLocation)}>
+              <input
+                type="checkbox"
+                id="use-location"
+                checked={useLocation}
+                onChange={(e) => setUseLocation(e.target.checked)}
+                disabled={isGettingLocation}
+                className="sr-only"
+              />
+              <div 
+                className={`w-11 h-6 rounded-full transition ${
+                  useLocation 
+                    ? 'bg-emerald-500' 
+                    : 'bg-gray-200 dark:bg-gray-700'
+                }`}
+              >
+                <div 
+                  className={`transform transition-transform duration-200 absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full ${
+                    useLocation ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+              <label 
+                htmlFor="use-location" 
+                className="ml-3 flex items-center gap-2 cursor-pointer text-sm font-medium"
+              >
+                <MapPin className="h-4 w-4 text-emerald-500" />
+                Include my location
+              </label>
+            </div>
+          </div>
+
+          {/* Location Status */}
+          {useLocation && (
+            <div className="text-sm">
+              {isGettingLocation ? (
+                <div className="flex items-center text-emerald-600 dark:text-emerald-500">
+                  <div className="mr-2 h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                  Getting your location...
+                </div>
+              ) : location ? (
+                <div className="text-emerald-600 dark:text-emerald-500">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {location.placeName || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
+                  </div>
+                </div>
+              ) : locationError ? (
+                <div className="text-red-500">{locationError}</div>
+              ) : null}
+            </div>
+          )}
+
+          <span className="text-red-500 text-sm mt-2">
+            ⚠️ Voice input is supported only in the latest versions of Safari and Chrome browsers not supported in Brave.
+          </span>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-5 h-5" />
+            {isSubmitting ? "Saving..." : "Save Entry"}
+          </button>
+        </form>
+      )}
     </div>
   )
 }

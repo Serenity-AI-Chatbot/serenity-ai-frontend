@@ -71,11 +71,10 @@ export async function GET() {
         summary,
         mood_tags,
         keywords,
-        latest_articles,
-        nearby_places,
         sentences,
         created_at,
-        tags
+        tags,
+        is_processing
       `)
       .eq('user_id', session.user.id)
       .order("created_at", { ascending: false })
@@ -103,94 +102,89 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    console.log('📝 Journal creation started');
     // Get authenticated user
     const { session } = await requireAuth()
 
     // Get request body
-    const { title, content } = await request.json()
-
-    // Call Flask API to process the journal content
-    const flaskResponse = await fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text: content })
-    })
-
-    if (!flaskResponse.ok) {
-      throw new Error('Failed to process journal content')
+    const { title, content, location } = await request.json()
+    console.log(`📝 Received journal request: title="${title}", content length=${content.length} chars`);
+    if (location) {
+      console.log(`📝 Location data received: ${JSON.stringify(location)}`);
+    } else {
+      console.log(`📝 No location data provided`);
     }
 
-    // Get raw response and parse it safely
-    const rawResponse = await flaskResponse.text()
-    console.log('Raw Flask API response:', rawResponse)
-    
-    // Use our new parsing function
-    const flaskData = JSON.parse(rawResponse)
-    // const flaskData = await parseFlaskResponse(rawResponse);
-    // console.log('Parsed Flask API Data:', flaskData);
-
     // Generate tags using the helper function
+    console.log('📝 Generating tags...');
     const tags = await generateTags(content)
-    console.log('Tags:', tags)
-
-    // First prepare the journal data without embedding
-    const journalData = {
+    console.log(`📝 Generated tags: ${JSON.stringify(tags)}`);
+    
+    // Create initial journal with processing status
+    const initialJournalData = {
       user_id: session?.user.id,
       title,
       content,
-      summary: flaskData.summary,
-      mood_tags: flaskData.predictions,
-      keywords: flaskData.keywords,
       tags,
-      song: flaskData.song || 'https://www.youtube.com/watch?v=F-6qLrgbjKo',
+      is_processing: true,
+      location: location ? JSON.stringify(location) : null,
       created_at: new Date().toISOString(),
     }
+    console.log('📝 Creating initial journal entry with processing status');
 
-    // Generate embedding using the complete journal data
-    const embedding = await generateEmbedding(journalData)
-    
-    // Add embedding and remaining fields to journal data
-    const completeJournalData = {
-      ...journalData,
-      embedding,
-      latest_articles: { articles: flaskData.latest_articles.map((article: any) => ({
-        link: article.link,
-        title: article.title,
-        snippet: article.snippet
-      }))},
-      nearby_places: { places: flaskData.nearby_places.map((place: any) => ({
-        name: place.name,
-        types: place.types,
-        rating: place.rating,
-        address: place.address,
-        image_url: place.image,
-        user_ratings_total: place.user_ratings_total
-      }))},
-      sentences: flaskData.sentences,
-    }
-    console.log('Complete Journal Data:', completeJournalData)
-
-    // Insert journal into Supabase
-    console.log('Inserting journal into Supabase...')
-    const { data, error } = await supabase
+    // Insert initial journal into Supabase
+    const { data: journal, error: insertError } = await supabase
       .from('journals')
-      .insert([completeJournalData])
+      .insert([initialJournalData])
       .select()
       .single()
 
-    if (error) {
-      console.error('Supabase error:', error)
+    if (insertError) {
+      console.error('❌ Supabase insert error:', insertError)
       return NextResponse.json(
-        { error: error.message },
+        { error: insertError.message },
         { status: 500 }
       )
     }
 
-    return NextResponse.json(data)
+    console.log(`📝 Initial journal created with ID: ${journal.id}`);
+
+    // Get the webhook URL (base URL + webhook path)
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+    const host = request.headers.get('host') || 'localhost:3000'
+    const webhookUrl = `${protocol}://${host}/api/journal/webhook`
+    console.log(`📝 Webhook URL: ${webhookUrl}`);
+    
+    // Call Flask API to process the journal content asynchronously
+    console.log(`📝 Sending request to Flask API: ${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal-async`);
+    fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/journal-async`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        text: content,
+        journal_id: journal.id,
+        webhook_url: webhookUrl,
+        location: location ? location.placeName || `pune` : null
+      })
+    }).then(response => {
+      console.log(`📝 Flask API responded with status: ${response.status}`);
+      return response.text();
+    }).then(text => {
+      console.log(`📝 Flask API response: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`);
+    }).catch(err => {
+      console.error('❌ Error sending request to Flask API:', err)
+    });
+
+    console.log(`📝 Journal creation completed, returning response to client`);
+    return NextResponse.json({
+      ...journal,
+      status: 'processing',
+      message: 'Journal created. Content is being processed.'
+    })
   } catch (error) {
-    console.error('Journal creation error:', error)
+    console.error('❌ Journal creation error:', error)
     return NextResponse.json(
       { error: 'Failed to create journal' },
       { status: 500 }
