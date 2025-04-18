@@ -100,6 +100,60 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+// Custom component for tag cloud rendering with better styling
+const CustomTagRenderer = ({ tag, size, color }: any) => {
+  // Handle the case where tag is the value directly (string)
+  const value = typeof tag === 'string' ? tag : tag?.value || '';
+  const text = typeof tag === 'string' ? tag : tag?.text || value || '';
+  const count = tag?.count || 0;
+  
+  // Generate a unique key using text and count
+  const uniqueKey = `${text}-${count}-${Math.random().toString(36).substring(2, 9)}`;
+  
+  return (
+    <TooltipProvider key={uniqueKey}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="px-3 py-2.5 m-2 rounded-full transition-all duration-200 hover:scale-105 shadow-sm hover:shadow-md flex items-center justify-center"
+            style={{ 
+              fontSize: `${size}px`, 
+              backgroundColor: color || '#f3f4f6',
+              color: getContrastColor(color || '#f3f4f6')
+            }}
+          >
+            <span className="capitalize font-medium whitespace-nowrap">{text}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="bg-background/90 backdrop-blur-sm border border-border p-3 shadow-lg rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{moodEmojis[text] || "😶"}</span>
+            <div>
+              <p className="font-bold capitalize">{text}</p>
+              <p className="text-sm text-muted-foreground">{count} entries</p>
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+// Helper function to determine text color based on background for contrast
+function getContrastColor(hexColor: string) {
+  // If it's an HSL color, extract the lightness
+  if (hexColor.startsWith('hsl')) {
+    const match = hexColor.match(/hsl\(\d+,\s*\d+%,\s*(\d+)%\)/);
+    if (match && match[1]) {
+      const lightness = parseInt(match[1], 10);
+      return lightness > 60 ? '#000000' : '#ffffff';
+    }
+  }
+  
+  // Default to white for unknown colors
+  return '#ffffff';
+}
+
 export function MoodInsights() {
   const { moodData, loading, error, fetchMoodTrends } = useMoodStore();
   const [selectedDays, setSelectedDays] = useState<string>("30");
@@ -199,9 +253,8 @@ export function MoodInsights() {
   // Prepare data for word cloud
   const wordCloudData = Object.entries(moodTotals)
     .map(([mood, count]) => ({
-      value: mood,
+      value: mood.charAt(0).toUpperCase() + mood.slice(1), // Capitalize first letter
       count,
-      color: getColor(mood),
     }))
     .sort((a, b) => b.count - a.count);
     
@@ -386,34 +439,19 @@ export function MoodInsights() {
         </CardHeader>
         <CardContent>
           {wordCloudData.length > 0 ? (
-            <div className="flex justify-center p-4 h-[400px] overflow-auto">
+            <div className="flex justify-center p-4 h-[400px] overflow-auto bg-gradient-to-b from-white to-slate-50 rounded-lg">
               <TagCloud
-                minSize={20}
-                maxSize={60}
-                tags={wordCloudData.map(({ value, count }) => ({
-                  value: moodEmojis[value] || "😶",
-                  text: value,
-                  count: count
-                }))}
-                className="flex flex-wrap justify-center items-center w-full"
-                renderer={(tag: any, size: number, color: string) => (
-                  <TooltipProvider key={tag.text}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="inline-block m-2 cursor-pointer hover:opacity-80 transition-opacity text-center"
-                          style={{ fontSize: `${size}px` }}
-                        >
-                          <span>{tag.value}</span>
-                          <span className="block text-center capitalize mt-1" style={{ fontSize: '0.75rem' }}>{tag.text}</span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{tag.count} entries</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+                minSize={16}
+                maxSize={42}
+                tags={wordCloudData}
+                className="flex flex-wrap justify-center items-center gap-2 w-full max-w-4xl mx-auto"
+                colorOptions={{
+                  luminosity: 'dark',
+                  hue: 'random',
+                  format: 'rgba',
+                  alpha: 0.9
+                }}
+                onClick={(tag: any) => console.log('Tag clicked:', tag)}
               />
             </div>
           ) : (
