@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     // Get the webhook URL (base URL + webhook path)
     let webhookUrl
     if (process.env.NODE_ENV === 'development') {
-      webhookUrl = `https://serenity-ai-frontend-2.vercel.app/api/journal/webhook`
+      webhookUrl = `https://serenity-ai-frontend.vercel.app/api/journal/webhook`
     }
     else{
       const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
