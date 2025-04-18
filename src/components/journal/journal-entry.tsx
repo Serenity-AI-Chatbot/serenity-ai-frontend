@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Pencil, Save, Mic, MapPin, MessageCircle, ArrowRight, Sparkles } from "lucide-react"
+import { Pencil, Save, Mic, MapPin, MessageCircle, ArrowRight, Sparkles, ExternalLink, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog,
@@ -14,7 +14,9 @@ import {
 import { AwsTranscribeZenInput } from "@/components/journal/aws-transcribe-input-zen"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 interface LocationData {
   latitude: number;
@@ -39,6 +41,9 @@ export function JournalEntry() {
   const [chatResponse, setChatResponse] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+  const [journalId, setJournalId] = useState<string | null>(null)
+  const [journalReady, setJournalReady] = useState(false)
+  const [isRefetching, setIsRefetching] = useState(false)
   const savedJournalRef = useRef<{title: string; content: string; id?: string}>({ title: "", content: "" })
   
   // Get geolocation when the user toggles the switch
@@ -47,6 +52,58 @@ export function JournalEntry() {
       getLocation();
     }
   }, [useLocation]);
+
+  // Set up journal processing check with auto-refresh
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    if (isProcessing && journalId && !journalReady) {
+      // Auto-refresh every 3 seconds
+      intervalId = setInterval(() => {
+        fetchJournal(journalId);
+      }, 3000);
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isProcessing, journalId, journalReady]);
+  
+  const fetchJournal = async (id: string) => {
+    if (isRefetching) return;
+    
+    try {
+      setIsRefetching(true);
+      const response = await fetch(`/api/journal/${id}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch journal status");
+      }
+      
+      const data = await response.json();
+      console.log("Checking journal status:", data);
+      
+      // Check if journal processing is complete using similar logic to journal-detail
+      const isComplete = !data.is_processing && 
+                         data.summary && 
+                         (data.keywords && data.keywords.length > 0) && 
+                         ((data.nearbyPlaces?.places && data.nearbyPlaces.places.length > 0) || 
+                          (data.latestArticles?.articles && data.latestArticles.articles.length > 0));
+      
+      if (isComplete) {
+        setJournalReady(true);
+        toast({
+          title: "Journal Ready",
+          description: "Your journal has been processed and is ready to view!",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error("Error checking journal status:", error);
+    } finally {
+      setIsRefetching(false);
+    }
+  };
   
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -230,6 +287,9 @@ export function JournalEntry() {
         content: entry,
         id: data.id
       };
+      
+      // Set the journal ID for status checking
+      setJournalId(data.id);
 
       // Journal was created but is still processing
       if (data.status === "processing") {
@@ -277,6 +337,20 @@ export function JournalEntry() {
   const handleNewEntry = () => {
     setIsProcessing(false);
     setChatResponse("");
+    setJournalReady(false);
+    setJournalId(null);
+  };
+  
+  const viewJournal = () => {
+    if (journalId) {
+      router.push(`/journal/${journalId}`);
+    }
+  };
+  
+  const handleRefetch = () => {
+    if (journalId) {
+      fetchJournal(journalId);
+    }
   };
 
   return (
@@ -290,12 +364,26 @@ export function JournalEntry() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.5 }}
-        className="flex items-center gap-3 mb-8"
+        className="flex items-center justify-between mb-8"
       >
-        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-          <Pencil className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <Pencil className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h2 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-400">Daily Journal</h2>
         </div>
-        <h2 className="text-2xl font-semibold text-emerald-800 dark:text-emerald-400">Daily Journal</h2>
+        
+        {isProcessing && (
+          <Button 
+            variant="outline"
+            onClick={handleRefetch}
+            disabled={isRefetching}
+            className="flex items-center gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        )}
       </motion.div>
 
       {isProcessing ? (
@@ -305,36 +393,72 @@ export function JournalEntry() {
           transition={{ duration: 0.5 }}
           className="py-8"
         >
-          <div className="mb-8 text-center">
-            <div className="mx-auto w-16 h-16 mb-6">
-              <svg className="w-full h-full" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path
-                  className="text-emerald-500 opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                >
-                  <animateTransform
-                    attributeName="transform"
-                    type="rotate"
-                    from="0 12 12"
-                    to="360 12 12"
-                    dur="1s"
-                    repeatCount="indefinite"
-                  />
-                </path>
-              </svg>
-            </div>
-            <h3 className="text-xl font-medium text-emerald-700 dark:text-emerald-400 mb-2">
-              Processing your journal
-            </h3>
-            <p className="text-gray-700 dark:text-gray-300 max-w-md mx-auto">
-              We're analyzing your entry to provide personalized insights
-            </p>
-          </div>
+          {/* Processing Banner */}
+          <AnimatePresence>
+            {isProcessing && !journalReady && (
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="mb-8 bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex flex-col items-center justify-center text-center"
+              >
+                <div className="w-16 h-16 mb-4">
+                  <svg className="w-full h-full text-emerald-500" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    >
+                      <animateTransform
+                        attributeName="transform"
+                        type="rotate"
+                        from="0 12 12"
+                        to="360 12 12"
+                        dur="1s"
+                        repeatCount="indefinite"
+                      />
+                    </path>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-medium text-emerald-700 mb-2">Your journal is being processed</h3>
+                <p className="text-gray-700 dark:text-gray-300 max-w-lg">
+                  We're analyzing your journal entry and preparing AI insights. This process usually takes 
+                  about 2 minutes to complete. The page will automatically refresh when ready.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Journal Ready Alert */}
+          <AnimatePresence>
+            {journalReady && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mb-8 p-4 bg-emerald-100 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg"
+              >
+                <div className="flex flex-col sm:flex-row items-center justify-between">
+                  <p className="text-emerald-800 dark:text-emerald-400 mb-3 sm:mb-0">
+                    Your journal is now ready to view!
+                  </p>
+                  <Button
+                    onClick={viewJournal}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+                  >
+                    <span>View Journal</span>
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           {/* Chat response section */}
-          <div className={`mt-8 p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-all duration-500 ${chatResponse || isStreaming ? 'opacity-100 transform translate-y-0 max-h-[800px]' : 'opacity-0 transform -translate-y-4 max-h-0 overflow-hidden'}`}>
+          <div className={`mt-8 p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-all duration-500 ${chatResponse || isStreaming ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform -translate-y-4 max-h-0 overflow-hidden'}`}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -344,14 +468,44 @@ export function JournalEntry() {
               </h3>
             </div>
             
-            <div className="text-gray-800 dark:text-gray-200 whitespace-pre-line min-h-[120px] prose prose-emerald prose-sm max-w-none">
+            <div className="text-gray-800 dark:text-gray-200 min-h-[120px] max-h-[calc(70vh-200px)] overflow-y-auto pr-2 hover:pr-1 transition-all">
               {chatResponse ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.5 }}
+                  className="prose prose-emerald prose-sm dark:prose-invert max-w-none"
                 >
-                  <p>{chatResponse}</p>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    className="break-words"
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a 
+                          {...props} 
+                          className="break-all hover:underline text-blue-600 dark:text-blue-400"
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        />
+                      ),
+                      p: ({ node, ...props }) => (
+                        <p {...props} className="break-words whitespace-pre-wrap" />
+                      ),
+                      code: ({ node, className, children, ...props }: any) => {
+                        const isInline = !className || !className.includes('language-');
+                        return (
+                          <code
+                            className={`${className} ${isInline ? "px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono" : "bg-gray-100 dark:bg-gray-800 rounded font-mono"}`}
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        )
+                      },
+                    }}
+                  >
+                    {chatResponse}
+                  </ReactMarkdown>
                 </motion.div>
               ) : isStreaming ? (
                 <div className="flex items-center gap-2 py-4">

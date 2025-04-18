@@ -70,3 +70,13 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Code formatting styles */
+@layer utilities {
+  .inline-code {
+    @apply px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono;
+  }
+  .block-code {
+    @apply bg-gray-100 dark:bg-gray-800 rounded font-mono;
+  }
+}
