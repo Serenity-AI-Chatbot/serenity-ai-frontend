@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Clock,
   Tag,
-  Star
+  Star,
+  Trash2
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,17 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface JournalDetailProps {
   journal: {
@@ -75,8 +87,11 @@ const getYouTubeVideoId = (url: string) => {
 
 export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [journal, setJournal] = useState(initialJournal);
   const [isRefetching, setIsRefetching] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Determine if journal is still processing based on missing AI-generated content
   const isProcessing = journal.is_processing || 
@@ -105,6 +120,42 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
       console.error("Error fetching journal:", error);
     } finally {
       setIsRefetching(false);
+    }
+  };
+
+  const deleteJournal = async () => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/journal/${journal.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Journal deleted",
+          description: "Your journal entry has been successfully deleted.",
+          variant: "default",
+        });
+        router.push('/journal');
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Failed to delete",
+          description: errorData.error || "Could not delete this journal entry. Please try again.",
+          variant: "destructive",
+        });
+        setIsDeleting(false);
+        setShowDeleteDialog(false);
+      }
+    } catch (error) {
+      console.error("Error deleting journal:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -138,18 +189,59 @@ export function JournalDetail({ journal: initialJournal }: JournalDetailProps) {
           Back to Journal List
         </Button>
         
-        {isProcessing && (
+        <div className="flex gap-2">
+          {isProcessing && (
+            <Button 
+              variant="outline"
+              onClick={fetchJournal}
+              disabled={isRefetching}
+              className="flex items-center gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          )}
+          
           <Button 
-            variant="outline"
-            onClick={fetchJournal}
-            disabled={isRefetching}
-            className="flex items-center gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+            variant="outline" 
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={isDeleting}
+            className="flex items-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} />
-            Refresh
+            <Trash2 className="w-4 h-4" />
+            Delete
           </Button>
-        )}
+        </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your journal entry.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={deleteJournal} 
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Processing Banner */}
       <AnimatePresence>
